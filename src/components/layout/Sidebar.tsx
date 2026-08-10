@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   Receipt,
   Wallet,
+  ArrowRightLeft,
   PieChart,
   Target,
   Building,
@@ -22,6 +23,7 @@ import {
 export type NavTab =
   | 'dashboard'
   | 'transactions'
+  | 'transfers'
   | 'accounts'
   | 'budgets'
   | 'goals'
@@ -45,6 +47,7 @@ interface SidebarProps {
 export const navItems: { id: NavTab; label: string; icon: React.FC<{ className?: string }> }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'transactions', label: 'Transactions', icon: Receipt },
+  { id: 'transfers', label: 'Transfers', icon: ArrowRightLeft },
   { id: 'accounts', label: 'Accounts', icon: Wallet },
   { id: 'budgets', label: 'Budgets', icon: PieChart },
   { id: 'goals', label: 'Savings Goals', icon: Target },

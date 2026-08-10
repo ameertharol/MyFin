@@ -39,6 +39,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPageTitle, onToggleSideba
     notifications,
     openQuickAdd,
     addToast,
+    logout,
   } = useFinance();
 
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -303,7 +304,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPageTitle, onToggleSideba
                   <UserIcon className="w-3.5 h-3.5" /> Profile & Preferences
                 </button>
                 <button
-                  onClick={() => addToast('success', 'Logged Out', 'Demo session reset cleanly.')}
+                  onClick={() => logout()}
                   className="w-full flex items-center gap-2 px-4 py-2 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30"
                 >
                   <LogOut className="w-3.5 h-3.5" /> Sign Out

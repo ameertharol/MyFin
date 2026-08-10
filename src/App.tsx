@@ -7,8 +7,10 @@ import { ToastContainer } from './components/ui/ToastContainer';
 import { QuickAddModal } from './components/modals/QuickAddModal';
 
 // Pages
+import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { TransactionsPage } from './pages/TransactionsPage';
+import { TransfersPage } from './pages/TransfersPage';
 import { AccountsPage } from './pages/AccountsPage';
 import { BudgetsPage } from './pages/BudgetsPage';
 import { GoalsPage } from './pages/GoalsPage';
@@ -21,9 +23,19 @@ import { RecurringPage } from './pages/RecurringPage';
 import { SettingsPage } from './pages/SettingsPage';
 
 const AppContent: React.FC = () => {
+  const { isAuthenticated } = useFinance();
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
   const [isOpenMobile, setIsOpenMobile] = useState<boolean>(false);
   const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
+
+  if (!isAuthenticated) {
+    return (
+      <>
+        <ToastContainer />
+        <LoginPage />
+      </>
+    );
+  }
 
   const getPageTitle = (tab: NavTab) => {
     switch (tab) {
@@ -31,6 +43,8 @@ const AppContent: React.FC = () => {
         return 'Executive Overview';
       case 'transactions':
         return 'Ledger Transactions';
+      case 'transfers':
+        return 'Inter-Account Transfers';
       case 'accounts':
         return 'Accounts & Balances';
       case 'budgets':
@@ -62,6 +76,8 @@ const AppContent: React.FC = () => {
         return <DashboardPage />;
       case 'transactions':
         return <TransactionsPage />;
+      case 'transfers':
+        return <TransfersPage />;
       case 'accounts':
         return <AccountsPage />;
       case 'budgets':
@@ -88,11 +104,11 @@ const AppContent: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
+    <div className="h-screen w-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200 overflow-hidden">
       <ToastContainer />
       <QuickAddModal />
 
-      <div className="flex flex-1 min-h-screen overflow-hidden">
+      <div className="flex flex-1 h-full overflow-hidden">
         {/* Sidebar */}
         <Sidebar
           activeTab={activeTab}
@@ -103,18 +119,22 @@ const AppContent: React.FC = () => {
           setIsCollapsed={setIsCollapsed}
         />
 
-        {/* Main Content Shell */}
-        <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+        {/* Main Content Shell with Sticky Header & Independent Scroll */}
+        <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+          {/* Top Header - Fixed & Non-scrollable */}
           <Navbar
             currentPageTitle={getPageTitle(activeTab)}
             onToggleSidebar={() => setIsOpenMobile(!isOpenMobile)}
           />
 
-          <main className="flex-1 p-4 sm:p-6 md:p-8 max-w-7xl w-full mx-auto">
-            {renderActivePage()}
-          </main>
+          {/* Scrollable Page View Body */}
+          <div className="flex-1 overflow-y-auto flex flex-col">
+            <main className="flex-1 p-4 sm:p-6 md:p-8 max-w-7xl w-full mx-auto">
+              {renderActivePage()}
+            </main>
 
-          <Footer />
+            <Footer />
+          </div>
         </div>
       </div>
     </div>

@@ -1,6 +1,18 @@
 export type OwnershipType = 'Personal' | 'Shared' | 'Household';
 
-export type AccountType = 'Cash' | 'Current' | 'Savings' | 'CreditCard' | 'DigitalWallet' | 'FixedDeposit' | 'Other';
+export type AccountType =
+  | 'Capital'
+  | 'Asset'
+  | 'Liability'
+  | 'Income'
+  | 'Expense'
+  | 'Cash'
+  | 'Current'
+  | 'Savings'
+  | 'CreditCard'
+  | 'DigitalWallet'
+  | 'FixedDeposit'
+  | 'Other';
 
 export type TransactionType =
   | 'Income'
@@ -96,7 +108,7 @@ export interface Transaction {
   UpdatedDate?: string;
 }
 
-export type CategoryType = 'Income' | 'Expense' | 'Asset' | 'Liability';
+export type CategoryType = 'Capital' | 'Asset' | 'Liability' | 'Income' | 'Expense';
 
 export interface Category {
   CategoryID: string;
@@ -299,19 +311,137 @@ export interface AuditLog {
   IPAddress?: string;
 }
 
-export interface RoleGroup {
-  GroupID: string;
-  GroupName: string;
-  Description: string;
-  Permissions: {
+export interface RoleGroupPermissions {
+  // Legacy top-level fallbacks
+  canCreate: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+  canCancel: boolean;
+  canViewDashboard: boolean;
+  canManageTransactions: boolean;
+  canManageAccounts: boolean;
+  canManageTransfers: boolean;
+  canManageBudgets: boolean;
+  canManageGoals: boolean;
+  canManageAssets: boolean;
+  canManageLiabilities: boolean;
+  canManageInvestments: boolean;
+  canManageRecurring: boolean;
+  canManageReminders: boolean;
+  canViewReports: boolean;
+  canManageSettings: boolean;
+  canManageUsers: boolean;
+  canExportTables: boolean;
+
+  // Detailed Section & Option Permissions
+  dashboardOptions?: {
+    canView: boolean;
+    canViewKPIs: boolean;
+    canViewNetWorthChart: boolean;
+    canViewIncomeExpenseChart: boolean;
+    canViewCategoryBreakdown: boolean;
+    canViewRecentTransactions: boolean;
+  };
+  transactionsOptions?: {
+    canView: boolean;
     canCreate: boolean;
     canEdit: boolean;
     canDelete: boolean;
     canCancel: boolean;
-    canViewReports: boolean;
-    canManageSettings: boolean;
+    canShareReceipt: boolean;
+    canExportCSV: boolean;
   };
+  transfersOptions?: {
+    canView: boolean;
+    canCreate: boolean;
+    canDelete: boolean;
+    canExportCSV: boolean;
+  };
+  accountsOptions?: {
+    canView: boolean;
+    canCreate: boolean;
+    canEdit: boolean;
+    canDelete: boolean;
+    canReconcile: boolean;
+    canExportStatement: boolean;
+  };
+  budgetsOptions?: {
+    canView: boolean;
+    canCreate: boolean;
+    canEdit: boolean;
+    canDelete: boolean;
+  };
+  goalsOptions?: {
+    canView: boolean;
+    canCreate: boolean;
+    canEdit: boolean;
+    canDelete: boolean;
+    canAddContribution: boolean;
+  };
+  assetsLiabilitiesOptions?: {
+    canView: boolean;
+    canCreateAsset: boolean;
+    canEditAsset: boolean;
+    canDeleteAsset: boolean;
+    canCreateLiability: boolean;
+    canPayLiability: boolean;
+    canDeleteLiability: boolean;
+  };
+  investmentsOptions?: {
+    canView: boolean;
+    canCreate: boolean;
+    canLiquidate: boolean;
+    canDelete: boolean;
+  };
+  recurringRemindersOptions?: {
+    canView: boolean;
+    canCreateRecurring: boolean;
+    canEditRecurring: boolean;
+    canCreateReminder: boolean;
+  };
+  reportsOptions?: {
+    canView: boolean;
+    canExportPDF: boolean;
+    canExportExcel: boolean;
+  };
+  settingsOptions?: {
+    canManageSettings: boolean;
+    canManageUsers: boolean;
+    canManageRoles: boolean;
+    canManageCategories: boolean;
+    canManageCurrencies: boolean;
+    canViewAuditLogs: boolean;
+  };
+}
+
+export interface RoleGroup {
+  GroupID: string;
+  GroupName: string;
+  Description: string;
+  Permissions: RoleGroupPermissions;
   IsSystem?: boolean;
+}
+
+export interface SavingsContribution {
+  ContributionID: string;
+  GoalID: string;
+  AccountID?: string;
+  Amount: number;
+  Currency: string;
+  Date: string;
+  Notes?: string;
+  CreatedBy: string;
+}
+
+export interface DashboardConfig {
+  showKpis: boolean;
+  showNetWorthChart: boolean;
+  showIncomeExpenseChart: boolean;
+  showCategoryPieChart: boolean;
+  showAccountsWidget: boolean;
+  showRecentTransactionsTable: boolean;
+  showAssetLiabilityWidget: boolean;
+  showCapitalBreakdown: boolean;
 }
 
 export interface UndoAction {
@@ -345,6 +475,11 @@ export interface Settings {
   SpreadsheetId?: string;
   AppsScriptDeploymentUrl?: string;
   DemoDataEnabled: boolean;
+  DashboardConfig?: DashboardConfig;
+  FooterText?: string;
+  FooterCopyright?: string;
+  FooterContactInfo?: string;
+  ShowFooter?: boolean;
 }
 
 export interface FilterState {

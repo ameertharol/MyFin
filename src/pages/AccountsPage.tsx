@@ -15,7 +15,7 @@ import { ReconciliationModal } from '../components/modals/ReconciliationModal';
 import { AccountEditModal } from '../components/modals/AccountEditModal';
 
 export const AccountsPage: React.FC = () => {
-  const { accounts, formatMoney, setReconcileAccount } = useFinance();
+  const { accounts, formatMoney, setReconcileAccount, settings, convertCurrency } = useFinance();
   const [selectedStatementAccount, setSelectedStatementAccount] = useState<Account | null>(null);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -146,12 +146,22 @@ export const AccountsPage: React.FC = () => {
 
                 {/* Balance Display */}
                 <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
-                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                    {isCredit ? 'Outstanding Balance' : 'Current Available Ledger'}
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                      {isCredit ? 'Outstanding Balance' : 'Current Available Ledger'}
+                    </p>
+                    <span className="px-2 py-0.5 rounded font-mono text-[10px] font-bold bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300">
+                      {acc.Currency}
+                    </span>
+                  </div>
                   <p className={`text-2xl font-black mt-0.5 ${acc.CurrentBalance < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'}`}>
                     {formatMoney(acc.CurrentBalance, acc.Currency)}
                   </p>
+                  {acc.Currency !== settings.BaseCurrency && (
+                    <p className="text-[11px] text-slate-400 font-mono mt-0.5">
+                      ≈ {formatMoney(convertCurrency(acc.CurrentBalance, acc.Currency), settings.BaseCurrency)} ({settings.BaseCurrency})
+                    </p>
+                  )}
                 </div>
 
                 {/* Credit Card Specific Progress */}

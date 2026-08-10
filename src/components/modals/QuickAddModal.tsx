@@ -160,36 +160,42 @@ export const QuickAddModal: React.FC = () => {
       });
     } else if (activeTab === 'Asset') {
       if (!assetName) return alert('Please enter asset name.');
-      addAsset({
-        AssetName: assetName,
-        AssetType: assetType as any,
-        PurchaseDate: date,
-        PurchaseCost: numAmount,
-        CurrentValue: parseFloat(assetValue) || numAmount,
-        Currency: currency,
-        OwnerUserID: ownerUserId,
-        OwnershipType: ownershipType,
-        Status: 'Active',
-        Notes: notes,
-      });
+      addAsset(
+        {
+          AssetName: assetName,
+          AssetType: assetType as any,
+          PurchaseDate: date,
+          PurchaseCost: numAmount,
+          CurrentValue: parseFloat(assetValue) || numAmount,
+          Currency: currency,
+          OwnerUserID: ownerUserId,
+          OwnershipType: ownershipType,
+          Status: 'Active',
+          Notes: notes,
+        },
+        accountId || undefined
+      );
     } else if (activeTab === 'Liability') {
       if (!liabilityName) return alert('Please enter liability name.');
-      addLiability({
-        LiabilityName: liabilityName,
-        LiabilityType: liabilityType as any,
-        Lender: bankName || 'Bank',
-        OriginalAmount: numAmount,
-        OutstandingAmount: numAmount,
-        InterestRate: parseFloat(interestRate) || 0,
-        StartDate: date,
-        DueDate: '2028-12-31',
-        MonthlyPayment: parseFloat(monthlyPayment) || 500,
-        Currency: currency,
-        OwnerUserID: ownerUserId,
-        OwnershipType: ownershipType,
-        Status: 'Active',
-        Notes: notes,
-      });
+      addLiability(
+        {
+          LiabilityName: liabilityName,
+          LiabilityType: liabilityType as any,
+          Lender: bankName || 'Lender / Person',
+          OriginalAmount: numAmount,
+          OutstandingAmount: numAmount,
+          InterestRate: parseFloat(interestRate) || 0,
+          StartDate: date,
+          DueDate: '2028-12-31',
+          MonthlyPayment: parseFloat(monthlyPayment) || 500,
+          Currency: currency,
+          OwnerUserID: ownerUserId,
+          OwnershipType: ownershipType,
+          Status: 'Active',
+          Notes: notes,
+        },
+        accountId || undefined
+      );
     } else if (activeTab === 'Reminder') {
       if (!reminderTitle && !description) return alert('Please enter reminder title.');
       addReminder({
@@ -736,6 +742,24 @@ export const QuickAddModal: React.FC = () => {
                     <option value="Household">Household</option>
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                  {activeTab === 'Asset' ? 'Paid From Account (Optional)' : 'Borrowed Cash Deposited To (Optional)'}
+                </label>
+                <select
+                  value={accountId}
+                  onChange={(e) => setAccountId(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-500 outline-none"
+                >
+                  <option value="">No Automatic Account Deduction/Deposit</option>
+                  {accounts.map((acc) => (
+                    <option key={acc.AccountID} value={acc.AccountID}>
+                      {acc.AccountName} ({acc.CurrentBalance} {acc.Currency})
+                    </option>
+                  ))}
+                </select>
               </div>
             </>
           )}

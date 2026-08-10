@@ -24,6 +24,7 @@ import {
   Currency,
   ExchangeRate,
   UndoAction,
+  SavingsContribution,
 } from '../types/finance';
 import {
   initialUsers,
@@ -45,6 +46,7 @@ import {
   initialCurrencies,
   initialExchangeRates,
   initialRoleGroups,
+  initialSavingsContributions,
 } from '../data/initialData';
 import { ConfirmModal } from '../components/modals/ConfirmModal';
 import { exportTransactionAsImage } from '../utils/imageExport';
@@ -58,6 +60,10 @@ export interface ToastMessage {
 }
 
 interface FinanceContextType {
+  isAuthenticated: boolean;
+  login: (username: string, password: string) => boolean;
+  logout: () => void;
+
   currentUser: User;
   users: User[];
   setCurrentUser: (user: User) => void;
@@ -152,12 +158,17 @@ interface FinanceContextType {
   addCurrency: (currency: Currency) => void;
   updateExchangeRate: (fromCurrency: string, toCurrency: string, rate: number) => void;
 
+  savingsContributions: SavingsContribution[];
+  addSavingsContribution: (contribution: Omit<SavingsContribution, 'ContributionID'>) => void;
+  updateSavingsContribution: (contribution: SavingsContribution) => void;
+  deleteSavingsContribution: (contributionId: string) => void;
+
   addBudget: (budget: Omit<Budget, 'BudgetID' | 'ActualAmount'>) => void;
   addGoal: (goal: Omit<Goal, 'GoalID'>) => void;
   addGoalContribution: (goalId: string, amount: number) => void;
-  addAsset: (asset: Omit<Asset, 'AssetID'>) => void;
+  addAsset: (asset: Omit<Asset, 'AssetID'>, fundingAccountId?: string) => void;
   updateAssetValue: (assetId: string, newValue: number) => void;
-  addLiability: (liability: Omit<Liability, 'LiabilityID'>) => void;
+  addLiability: (liability: Omit<Liability, 'LiabilityID'>, receivingAccountId?: string) => void;
   recordLiabilityPayment: (liabilityId: string, amount: number) => void;
   addInvestment: (investment: Omit<Investment, 'InvestmentID'>) => void;
   addReminder: (reminder: Omit<Reminder, 'ReminderID'>) => void;
@@ -203,6 +214,13 @@ interface FinanceContextType {
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
 
 export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('auth_session') === 'true';
+    }
+    return false;
+  });
+
   const [users, setUsers] = useState<User[]>(initialUsers);
   const [currentUser, setCurrentUser] = useState<User>(initialUsers[0]);
   const [settings, setSettings] = useState<Settings>(initialSettings);
@@ -231,12 +249,38 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     localStorage.setItem('theme', theme);
   }, [theme]);
 
+  const login = (uName: string, pass: string): boolean => {
+    const found = users.find(
+      (u) => u.Username.toLowerCase() === uName.toLowerCase() && (u.Password === pass || !u.Password)
+    );
+    if (found) {
+      setCurrentUser(found);
+      setIsAuthenticated(true);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('auth_session', 'true');
+      }
+      addAuditLog('Login', 'Auth', found.UserID, `Authenticated session for ${found.FullName}`);
+      addToast('success', 'Welcome Back', `Logged in as ${found.FullName}`);
+      return true;
+    }
+    return false;
+  };
+
+  const logout = () => {
+    setIsAuthenticated(false);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('auth_session');
+    }
+    addToast('info', 'Logged Out', 'You have been signed out.');
+  };
+
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts);
   const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
   const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [parties, setParties] = useState<Party[]>(initialParties);
   const [budgets, setBudgets] = useState<Budget[]>(initialBudgets);
   const [goals, setGoals] = useState<Goal[]>(initialGoals);
+  const [savingsContributions, setSavingsContributions] = useState<SavingsContribution[]>(initialSavingsContributions);
   const [assets, setAssets] = useState<Asset[]>(initialAssets);
   const [liabilities, setLiabilities] = useState<Liability[]>(initialLiabilities);
   const [investments, setInvestments] = useState<Investment[]>(initialInvestments);
@@ -350,8 +394,9 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   const registerUndo = (description: string, undoFn: () => void) => {
+    const id = 'UNDO-' + Date.now() + '-' + Math.floor(Math.random() * 100000);
     const action: UndoAction = {
-      id: 'UNDO-' + Date.now(),
+      id,
       description,
       timestamp: Date.now(),
       undo: undoFn,
@@ -391,7 +436,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   const addToast = (type: ToastMessage['type'], title: string, message: string, onUndo?: () => void) => {
-    const id = 'TST-' + Date.now();
+    const id = 'TST-' + Date.now() + '-' + Math.floor(Math.random() * 1000000);
     setToasts((prev) => [...prev, { id, type, title, message, onUndo }]);
     setTimeout(() => removeToast(id), 6000);
   };
@@ -499,29 +544,28 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       transactions.forEach((t) => {
         if (t.Status !== 'Finalized') return;
 
-        // Account affected as primary
+        // Account affected as primary (From account)
         if (t.AccountID === acc.AccountID) {
-          const amt = t.BaseCurrencyAmount || t.Amount;
-          if (t.TransactionType === 'Income' || t.TransactionType === 'Refund') {
-            balance += amt;
+          const fromAmt = t.Currency === acc.Currency ? t.Amount : convertCurrency(t.Amount, t.Currency, acc.Currency);
+          if (t.TransactionType === 'Income' || t.TransactionType === 'Refund' || t.TransactionType === 'Asset Sale') {
+            balance += fromAmt;
           } else if (
             t.TransactionType === 'Expense' ||
             t.TransactionType === 'Debt Payment' ||
             t.TransactionType === 'Asset Purchase' ||
-            t.TransactionType === 'Investment'
+            t.TransactionType === 'Investment' ||
+            t.TransactionType === 'Transfer'
           ) {
-            balance -= amt;
-          } else if (t.TransactionType === 'Transfer') {
-            balance -= amt;
-          } else if (t.TransactionType === 'Asset Sale') {
-            balance += amt;
+            balance -= fromAmt;
           }
         }
 
-        // Account affected as transfer destination
+        // Account affected as transfer destination (To account)
         if (t.TransferAccountID === acc.AccountID && t.TransactionType === 'Transfer') {
-          const amt = t.BaseCurrencyAmount || t.Amount;
-          balance += amt;
+          // Destination amount calculated with custom rate
+          const rate = t.ExchangeRate || 1;
+          const destinationAmount = t.Amount * rate;
+          balance += destinationAmount;
         }
       });
 
@@ -530,7 +574,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         CurrentBalance: balance,
       };
     });
-  }, [accounts, transactions]);
+  }, [accounts, transactions, convertCurrency]);
 
   // Filtered Transactions
   const filteredTransactions = useMemo(() => {
@@ -823,10 +867,105 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     addToast('success', 'Contribution Saved', `Added ${formatMoney(amount)} towards savings target.`);
   };
 
-  const addAsset = (astData: Omit<Asset, 'AssetID'>) => {
+  const addSavingsContribution = (cData: Omit<SavingsContribution, 'ContributionID'>) => {
+    const conId = 'CON-' + Math.floor(100000 + Math.random() * 900000);
+    const newCon: SavingsContribution = { ...cData, ContributionID: conId };
+    setSavingsContributions((prev) => [newCon, ...prev]);
+
+    // Update Goal current amount
+    setGoals((prev) =>
+      prev.map((g) => {
+        if (g.GoalID === cData.GoalID) {
+          const nextAmt = g.CurrentAmount + cData.Amount;
+          const status = nextAmt >= g.TargetAmount ? 'Completed' : 'In Progress';
+          return { ...g, CurrentAmount: nextAmt, Status: status };
+        }
+        return g;
+      })
+    );
+
+    // Create an Expense/Transfer transaction if AccountID is selected
+    if (cData.AccountID) {
+      const goalObj = goals.find((g) => g.GoalID === cData.GoalID);
+      addTransaction({
+        Date: cData.Date,
+        TransactionType: 'Expense',
+        AccountID: cData.AccountID,
+        Amount: cData.Amount,
+        Currency: cData.Currency,
+        ExchangeRate: 1,
+        BaseCurrencyAmount: convertCurrency(cData.Amount, cData.Currency),
+        CategoryID: 'CAT-FINANCIAL',
+        Description: `Savings Contribution: ${goalObj?.GoalName || 'Goal'}`,
+        OwnerUserID: currentUser.UserID,
+        OwnershipType: 'Shared',
+        Notes: cData.Notes,
+      });
+    }
+
+    addToast('success', 'Savings Contribution Added', `Added ${formatMoney(cData.Amount, cData.Currency)} to goal.`);
+  };
+
+  const updateSavingsContribution = (updatedCon: SavingsContribution) => {
+    const oldCon = savingsContributions.find((c) => c.ContributionID === updatedCon.ContributionID);
+    const diff = updatedCon.Amount - (oldCon?.Amount || 0);
+
+    setSavingsContributions((prev) => prev.map((c) => (c.ContributionID === updatedCon.ContributionID ? updatedCon : c)));
+
+    if (diff !== 0) {
+      setGoals((prev) =>
+        prev.map((g) => {
+          if (g.GoalID === updatedCon.GoalID) {
+            const nextAmt = g.CurrentAmount + diff;
+            const status = nextAmt >= g.TargetAmount ? 'Completed' : 'In Progress';
+            return { ...g, CurrentAmount: Math.max(0, nextAmt), Status: status };
+          }
+          return g;
+        })
+      );
+    }
+    addToast('success', 'Contribution Updated', 'Savings contribution entry updated.');
+  };
+
+  const deleteSavingsContribution = (contributionId: string) => {
+    const con = savingsContributions.find((c) => c.ContributionID === contributionId);
+    if (con) {
+      setGoals((prev) =>
+        prev.map((g) => {
+          if (g.GoalID === con.GoalID) {
+            const nextAmt = Math.max(0, g.CurrentAmount - con.Amount);
+            return { ...g, CurrentAmount: nextAmt, Status: nextAmt >= g.TargetAmount ? 'Completed' : 'In Progress' };
+          }
+          return g;
+        })
+      );
+    }
+    setSavingsContributions((prev) => prev.filter((c) => c.ContributionID !== contributionId));
+    addToast('warning', 'Contribution Removed', 'Contribution record deleted.');
+  };
+
+  const addAsset = (astData: Omit<Asset, 'AssetID'>, fundingAccountId?: string) => {
     const astId = 'AST-' + Math.floor(100000 + Math.random() * 900000);
     const newAsset: Asset = { ...astData, AssetID: astId };
     setAssets((prev) => [...prev, newAsset]);
+
+    if (fundingAccountId) {
+      addTransaction({
+        Date: astData.PurchaseDate,
+        TransactionType: 'Expense',
+        AccountID: fundingAccountId,
+        Amount: astData.PurchaseCost,
+        Currency: astData.Currency,
+        ExchangeRate: 1,
+        BaseCurrencyAmount: convertCurrency(astData.PurchaseCost, astData.Currency),
+        CategoryID: 'CAT-PERSONAL',
+        Description: `Asset Purchase: ${astData.AssetName}`,
+        OwnerUserID: astData.OwnerUserID,
+        OwnershipType: astData.OwnershipType,
+        Notes: `Funding for asset ${astData.AssetName}`,
+      });
+    }
+
     addAuditLog('Create', 'Assets', astId, `Added asset ${astData.AssetName}`);
     addToast('success', 'Asset Added', `Registered asset ${astData.AssetName}.`);
   };
@@ -837,10 +976,28 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     addToast('success', 'Asset Revalued', `Updated valuation to ${formatMoney(newValue)}.`);
   };
 
-  const addLiability = (lData: Omit<Liability, 'LiabilityID'>) => {
+  const addLiability = (lData: Omit<Liability, 'LiabilityID'>, receivingAccountId?: string) => {
     const lId = 'LIA-' + Math.floor(100000 + Math.random() * 900000);
     const newLiability: Liability = { ...lData, LiabilityID: lId };
     setLiabilities((prev) => [...prev, newLiability]);
+
+    if (receivingAccountId) {
+      addTransaction({
+        Date: lData.StartDate,
+        TransactionType: 'Income',
+        AccountID: receivingAccountId,
+        Amount: lData.OriginalAmount,
+        Currency: lData.Currency,
+        ExchangeRate: 1,
+        BaseCurrencyAmount: convertCurrency(lData.OriginalAmount, lData.Currency),
+        CategoryID: 'CAT-SALARY',
+        Description: `Borrowed Cash Deposited: ${lData.LiabilityName}`,
+        OwnerUserID: lData.OwnerUserID,
+        OwnershipType: lData.OwnershipType,
+        Notes: `Borrowed cash from ${lData.Lender}`,
+      });
+    }
+
     addAuditLog('Create', 'Liabilities', lId, `Added liability ${lData.LiabilityName}`);
     addToast('success', 'Liability Recorded', `Registered obligation ${lData.LiabilityName}.`);
   };
@@ -1063,6 +1220,10 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   return (
     <FinanceContext.Provider
       value={{
+        isAuthenticated,
+        login,
+        logout,
+
         currentUser,
         users,
         setCurrentUser,
@@ -1099,6 +1260,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         parties,
         budgets,
         goals,
+        savingsContributions,
         assets,
         liabilities,
         investments,
@@ -1139,6 +1301,9 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         addSubCategory,
         addCurrency,
         updateExchangeRate,
+        addSavingsContribution,
+        updateSavingsContribution,
+        deleteSavingsContribution,
         addBudget,
         addGoal,
         addGoalContribution,

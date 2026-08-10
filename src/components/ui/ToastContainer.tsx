@@ -9,14 +9,14 @@ export const ToastContainer: React.FC = () => {
 
   return (
     <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0">
-      {toasts.map((toast) => {
+      {toasts.map((toast, idx) => {
         const isSuccess = toast.type === 'success';
         const isError = toast.type === 'error';
         const isWarning = toast.type === 'warning';
 
         return (
           <div
-            key={toast.id}
+            key={`${toast.id}-${idx}`}
             className={`pointer-events-auto flex items-start gap-3 p-4 rounded-xl shadow-lg border backdrop-blur-md transition-all duration-300 transform translate-y-0 ${
               isSuccess
                 ? 'bg-emerald-950/90 border-emerald-800/50 text-emerald-100 dark:bg-emerald-950/90 dark:border-emerald-800'
