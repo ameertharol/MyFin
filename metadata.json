@@ -1,0 +1,6 @@
+{
+  "name": "Couple Finance",
+  "description": "Comprehensive couple and personal finance tracker with multi-account, budget, asset/liability, investment management, Google Sheets & Apps Script integration, and automated workflows.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
