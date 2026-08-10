@@ -3,14 +3,19 @@ import { useFinance } from '../context/FinanceContext';
 import { PieChart, Plus, AlertTriangle, CheckCircle, ShieldAlert } from 'lucide-react';
 
 export const BudgetsPage: React.FC = () => {
-  const { budgets, categories, formatMoney, openQuickAdd } = useFinance();
+  const { budgets, categories, formatMoney, openQuickAdd, settings } = useFinance();
+
+  const headerInfo = settings.pageHeaders?.['budgets'] || {
+    title: 'Budgeting & Spending Thresholds',
+    subtitle: 'Plan monthly spending caps by category and track variance',
+  };
 
   return (
     <div className="space-y-6 pb-12">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white">Budgeting & Spending Thresholds</h2>
-          <p className="text-xs text-slate-500">Plan monthly spending caps by category and track variance</p>
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white">{headerInfo.title}</h2>
+          <p className="text-xs text-slate-500">{headerInfo.subtitle}</p>
         </div>
 
         <button

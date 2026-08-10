@@ -82,13 +82,18 @@ export const ReportsPage: React.FC = () => {
 
   const netAssetWorth = totalAssets - totalLiabilities;
 
+  const headerInfo = settings.pageHeaders?.['reports'] || {
+    title: 'Detailed Financial Analytics & Reporting',
+    subtitle: 'Comprehensive couple statements, category breakdowns, cash flow variances & asset audit',
+  };
+
   return (
     <div className="space-y-6 pb-12 print:p-0">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white">Detailed Financial Analytics & Reporting</h2>
-          <p className="text-xs text-slate-500">Comprehensive couple statements, category breakdowns, cash flow variances & asset audit</p>
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white">{headerInfo.title}</h2>
+          <p className="text-xs text-slate-500">{headerInfo.subtitle}</p>
         </div>
 
         <div className="flex items-center gap-2">

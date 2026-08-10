@@ -1,5 +1,6 @@
 import React from 'react';
 import { useFinance } from '../../context/FinanceContext';
+import { canAccessTab } from '../../utils/permissionUtils';
 import {
   LayoutDashboard,
   Receipt,
@@ -68,7 +69,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isCollapsed,
   setIsCollapsed,
 }) => {
-  const { settings } = useFinance();
+  const { settings, currentPermissions } = useFinance();
+
+  const allowedNavItems = navItems.filter((item) => canAccessTab(item.id, currentPermissions));
 
   const sidebarClasses = `fixed md:static inset-y-0 left-0 z-40 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 flex flex-col justify-between ${
     isCollapsed ? 'w-20' : 'w-64'
@@ -118,7 +121,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Navigation List */}
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-          {navItems.map((item) => {
+          {allowedNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
 

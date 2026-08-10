@@ -100,8 +100,32 @@ export const DashboardPage: React.FC = () => {
     insights.push({ type: 'info', text: `${topCategory.name} is your highest spending category at ${formatMoney(topCategory.value)}.` });
   }
 
+  const dashCfg = settings.DashboardConfig || {
+    showKpis: true,
+    showNetWorthChart: true,
+    showIncomeExpenseChart: true,
+    showCategoryPieChart: true,
+    showAccountsWidget: true,
+    showRecentTransactionsTable: true,
+    showAssetLiabilityWidget: true,
+    showCapitalBreakdown: true,
+  };
+
+  const headerInfo = settings.pageHeaders?.['dashboard'] || {
+    title: 'Financial Dashboard & Overview',
+    subtitle: 'Real-time performance metrics, net worth trajectory, and household cashflow analytics.',
+  };
+
   return (
     <div className="space-y-6 pb-12">
+      {/* Header Title & Subtitle */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white">{headerInfo.title}</h2>
+          <p className="text-xs text-slate-500">{headerInfo.subtitle}</p>
+        </div>
+      </div>
+
       {/* Filter Bar */}
       <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -194,87 +218,89 @@ export const DashboardPage: React.FC = () => {
       </div>
 
       {/* Primary Financial Overview KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Net Worth */}
-        <div className="p-5 bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl shadow-lg border border-slate-700 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
-              <span>Total Net Worth</span>
-              <span className="p-1.5 rounded-lg bg-teal-500/20 text-teal-400">
-                <Wallet className="w-4 h-4" />
-              </span>
+      {dashCfg.showKpis !== false && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Total Net Worth */}
+          <div className="p-5 bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl shadow-lg border border-slate-700 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
+                <span>Total Net Worth</span>
+                <span className="p-1.5 rounded-lg bg-teal-500/20 text-teal-400">
+                  <Wallet className="w-4 h-4" />
+                </span>
+              </div>
+              <h3 className="text-2xl font-black text-white tracking-tight">
+                {formatMoney(summaryMetrics.netWorth)}
+              </h3>
             </div>
-            <h3 className="text-2xl font-black text-white tracking-tight">
-              {formatMoney(summaryMetrics.netWorth)}
-            </h3>
+            <div className="mt-4 pt-3 border-t border-slate-700/60 flex items-center justify-between text-xs text-slate-400">
+              <span>Assets: {formatMoney(summaryMetrics.totalAssets)}</span>
+              <span>Liabilities: {formatMoney(summaryMetrics.totalLiabilities)}</span>
+            </div>
           </div>
-          <div className="mt-4 pt-3 border-t border-slate-700/60 flex items-center justify-between text-xs text-slate-400">
-            <span>Assets: {formatMoney(summaryMetrics.totalAssets)}</span>
-            <span>Liabilities: {formatMoney(summaryMetrics.totalLiabilities)}</span>
-          </div>
-        </div>
 
-        {/* Monthly Income */}
-        <div className="p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between text-slate-500 text-xs font-semibold mb-1">
-              <span>Period Income</span>
-              <span className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400">
-                <TrendingUp className="w-4 h-4" />
-              </span>
+          {/* Monthly Income */}
+          <div className="p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between text-slate-500 text-xs font-semibold mb-1">
+                <span>Period Income</span>
+                <span className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400">
+                  <TrendingUp className="w-4 h-4" />
+                </span>
+              </div>
+              <h3 className="text-2xl font-bold text-slate-900 dark:text-white">
+                {formatMoney(summaryMetrics.totalIncome)}
+              </h3>
             </div>
-            <h3 className="text-2xl font-bold text-slate-900 dark:text-white">
-              {formatMoney(summaryMetrics.totalIncome)}
-            </h3>
+            <div className="mt-4 flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+              <ArrowUpRight className="w-4 h-4" />
+              <span>Regular Salary & Inflows</span>
+            </div>
           </div>
-          <div className="mt-4 flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-            <ArrowUpRight className="w-4 h-4" />
-            <span>Regular Salary & Inflows</span>
-          </div>
-        </div>
 
-        {/* Period Expenses */}
-        <div className="p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between text-slate-500 text-xs font-semibold mb-1">
-              <span>Period Expenses</span>
-              <span className="p-1.5 rounded-lg bg-rose-100 dark:bg-rose-950 text-rose-600 dark:text-rose-400">
-                <TrendingDown className="w-4 h-4" />
+          {/* Period Expenses */}
+          <div className="p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between text-slate-500 text-xs font-semibold mb-1">
+                <span>Period Expenses</span>
+                <span className="p-1.5 rounded-lg bg-rose-100 dark:bg-rose-950 text-rose-600 dark:text-rose-400">
+                  <TrendingDown className="w-4 h-4" />
+                </span>
+              </div>
+              <h3 className="text-2xl font-bold text-slate-900 dark:text-white">
+                {formatMoney(summaryMetrics.totalExpenses)}
+              </h3>
+            </div>
+            <div className="mt-4 flex items-center gap-1 text-xs text-slate-500 font-medium">
+              <span>Budget Remainder: </span>
+              <span className="font-semibold text-slate-900 dark:text-white">
+                {formatMoney(summaryMetrics.budgetRemaining)}
               </span>
             </div>
-            <h3 className="text-2xl font-bold text-slate-900 dark:text-white">
-              {formatMoney(summaryMetrics.totalExpenses)}
-            </h3>
           </div>
-          <div className="mt-4 flex items-center gap-1 text-xs text-slate-500 font-medium">
-            <span>Budget Remainder: </span>
-            <span className="font-semibold text-slate-900 dark:text-white">
-              {formatMoney(summaryMetrics.budgetRemaining)}
-            </span>
-          </div>
-        </div>
 
-        {/* Net Savings & Rate */}
-        <div className="p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between text-slate-500 text-xs font-semibold mb-1">
-              <span>Net Savings Rate</span>
-              <span className="p-1.5 rounded-lg bg-teal-100 dark:bg-teal-950 text-teal-600 dark:text-teal-400">
-                <PiggyBank className="w-4 h-4" />
+          {/* Net Savings & Rate */}
+          <div className="p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between text-slate-500 text-xs font-semibold mb-1">
+                <span>Net Savings Rate</span>
+                <span className="p-1.5 rounded-lg bg-teal-100 dark:bg-teal-950 text-teal-600 dark:text-teal-400">
+                  <PiggyBank className="w-4 h-4" />
+                </span>
+              </div>
+              <h3 className="text-2xl font-bold text-slate-900 dark:text-white">
+                {summaryMetrics.savingsRate.toFixed(1)}%
+              </h3>
+            </div>
+            <div className="mt-4 flex items-center justify-between text-xs font-medium text-slate-500">
+              <span>Net Cash Flow:</span>
+              <span className="font-bold text-teal-600 dark:text-teal-400">
+                {formatMoney(summaryMetrics.netCashFlow)}
               </span>
             </div>
-            <h3 className="text-2xl font-bold text-slate-900 dark:text-white">
-              {summaryMetrics.savingsRate.toFixed(1)}%
-            </h3>
-          </div>
-          <div className="mt-4 flex items-center justify-between text-xs font-medium text-slate-500">
-            <span>Net Cash Flow:</span>
-            <span className="font-bold text-teal-600 dark:text-teal-400">
-              {formatMoney(summaryMetrics.netCashFlow)}
-            </span>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Couple Financial Breakdown Grid */}
       <div className="p-5 bg-teal-950/10 border border-teal-800/20 dark:border-teal-800/40 rounded-2xl">

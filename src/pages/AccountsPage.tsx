@@ -16,7 +16,10 @@ import { AccountEditModal } from '../components/modals/AccountEditModal';
 
 export const AccountsPage: React.FC = () => {
   const { accounts, formatMoney, setReconcileAccount, settings, convertCurrency } = useFinance();
-  const [selectedStatementAccount, setSelectedStatementAccount] = useState<Account | null>(null);
+  const headerInfo = settings.pageHeaders?.['accounts'] || {
+    title: 'Financial Accounts Engine',
+    subtitle: 'Manage cash wallets, bank current/savings accounts, credit cards & e-wallets',
+  };
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
@@ -90,8 +93,8 @@ export const AccountsPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white">Financial Accounts Engine</h2>
-          <p className="text-xs text-slate-500">Manage cash wallets, bank current/savings accounts, credit cards & e-wallets</p>
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white">{headerInfo.title}</h2>
+          <p className="text-xs text-slate-500">{headerInfo.subtitle}</p>
         </div>
 
         <button

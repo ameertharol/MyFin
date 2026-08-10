@@ -480,6 +480,7 @@ export interface Settings {
   FooterCopyright?: string;
   FooterContactInfo?: string;
   ShowFooter?: boolean;
+  pageHeaders?: Record<string, { title: string; subtitle: string }>;
 }
 
 export interface FilterState {

@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FinanceProvider, useFinance } from './context/FinanceContext';
 import { Navbar } from './components/layout/Navbar';
-import { Sidebar, NavTab } from './components/layout/Sidebar';
+import { Sidebar, NavTab, navItems } from './components/layout/Sidebar';
 import { Footer } from './components/layout/Footer';
 import { ToastContainer } from './components/ui/ToastContainer';
 import { QuickAddModal } from './components/modals/QuickAddModal';
+import { canAccessTab } from './utils/permissionUtils';
+import { ShieldAlert } from 'lucide-react';
 
 // Pages
 import { LoginPage } from './pages/LoginPage';
@@ -23,10 +25,20 @@ import { RecurringPage } from './pages/RecurringPage';
 import { SettingsPage } from './pages/SettingsPage';
 
 const AppContent: React.FC = () => {
-  const { isAuthenticated } = useFinance();
+  const { isAuthenticated, currentPermissions } = useFinance();
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
   const [isOpenMobile, setIsOpenMobile] = useState<boolean>(false);
   const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
+
+  // Auto-switch to first allowed tab if current activeTab is restricted for logged in user role
+  useEffect(() => {
+    if (isAuthenticated && !canAccessTab(activeTab, currentPermissions)) {
+      const firstAllowed = navItems.find((item) => canAccessTab(item.id, currentPermissions));
+      if (firstAllowed) {
+        setActiveTab(firstAllowed.id);
+      }
+    }
+  }, [isAuthenticated, activeTab, currentPermissions]);
 
   if (!isAuthenticated) {
     return (
@@ -71,6 +83,24 @@ const AppContent: React.FC = () => {
   };
 
   const renderActivePage = () => {
+    if (!canAccessTab(activeTab, currentPermissions)) {
+      return (
+        <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
+          <div className="p-4 bg-amber-100 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 rounded-2xl">
+            <ShieldAlert className="w-10 h-10" />
+          </div>
+          <div className="max-w-md">
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+              Access Restricted
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Your role group permissions do not allow viewing the {getPageTitle(activeTab)} page. Please contact your system administrator if you believe this is an error.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
     switch (activeTab) {
       case 'dashboard':
         return <DashboardPage />;

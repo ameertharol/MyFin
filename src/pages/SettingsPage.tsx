@@ -21,6 +21,12 @@ import {
   Image,
   Globe,
   Lock,
+  ExternalLink,
+  Copy,
+  Check,
+  RefreshCw,
+  FileSpreadsheet,
+  Zap,
 } from 'lucide-react';
 import { UserEditModal } from '../components/modals/UserEditModal';
 import { CategoryEditModal } from '../components/modals/CategoryEditModal';
@@ -58,8 +64,181 @@ export const SettingsPage: React.FC = () => {
   const [fiscalYearMonth, setFiscalYearMonth] = useState(settings.FiscalYearStartMonth || 1);
   const [lowBalanceThreshold, setLowBalanceThreshold] = useState(settings.LowBalanceThreshold || 500);
 
+  const [sheetUrl, setSheetUrl] = useState<string>(
+    settings.SheetUrl || (settings.SpreadsheetId ? `https://docs.google.com/spreadsheets/d/${settings.SpreadsheetId}/edit` : '')
+  );
   const [spreadsheetId, setSpreadsheetId] = useState(settings.SpreadsheetId || '');
   const [deploymentUrl, setDeploymentUrl] = useState(settings.AppsScriptDeploymentUrl || '');
+  const [copiedScriptCode, setCopiedScriptCode] = useState(false);
+  const [isInitializingSheets, setIsInitializingSheets] = useState(false);
+
+  const handleSheetUrlChange = (val: string) => {
+    setSheetUrl(val);
+    const match = val.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    if (match && match[1]) {
+      setSpreadsheetId(match[1]);
+    } else if (!val.includes('/') && val.length > 10) {
+      setSpreadsheetId(val);
+    }
+  };
+
+  const APPS_SCRIPT_SOURCE = `/**
+ * Couple Finance - Google Apps Script Automation Backend
+ * Auto-creates all required sheet tabs & populates column headers automatically
+ */
+const SCHEMA = {
+  Users: ["UserID", "Username", "Password", "FullName", "Email", "Phone", "RoleID", "PartnerID", "DefaultCurrency", "Status", "CreatedDate", "UpdatedDate", "LastLogin"],
+  Roles: ["RoleID", "RoleName", "Description", "Permissions", "CreatedDate"],
+  Permissions: ["PermissionID", "PermissionName", "Module", "Description"],
+  Settings: ["SettingKey", "SettingValue", "Description", "UpdatedDate"],
+  AuditLogs: ["LogID", "UserID", "Action", "Module", "RecordID", "OldValue", "NewValue", "Timestamp", "IPAddress"],
+  NumberSequences: ["SequenceID", "DocumentType", "Prefix", "CurrentNumber", "NumberLength", "Format"],
+  Migrations: ["MigrationID", "Version", "Description", "ExecutedDate"],
+  Accounts: ["AccountID", "AccountName", "AccountType", "BankName", "AccountNumber", "CardNumberMasked", "CreditLimit", "IBAN", "OwnerUserID", "OwnershipType", "Currency", "OpeningBalance", "CurrentBalance", "OpeningDate", "InterestRate", "StatementDate", "DueDate", "MinimumPayment", "IncludeInNetWorth", "Status", "Notes", "CreatedDate", "UpdatedDate"],
+  Transactions: ["TransactionID", "Date", "Time", "TransactionType", "AccountID", "TransferAccountID", "Amount", "Currency", "ExchangeRate", "BaseCurrencyAmount", "CategoryID", "SubCategoryID", "PartyID", "Description", "OwnerUserID", "OwnershipType", "PaymentMethod", "Reference", "AttachmentID", "RecurringID", "Status", "Notes", "CreatedBy", "CreatedDate", "UpdatedBy", "UpdatedDate"],
+  Transfers: ["TransferID", "TransactionID", "FromAccountID", "ToAccountID", "Amount", "Currency", "ExchangeRate", "TransferFee", "TransferDate", "OwnerUserID", "OwnershipType", "CreatedDate"],
+  Categories: ["CategoryID", "CategoryName", "CategoryType", "Color", "Icon", "Status"],
+  SubCategories: ["SubCategoryID", "SubCategoryName", "CategoryID"],
+  Parties: ["PartyID", "PartyName", "PartyType", "Phone", "Email", "Address", "Notes", "Status"],
+  Currencies: ["CurrencyCode", "CurrencyName", "Symbol", "IsBase"],
+  ExchangeRates: ["FromCurrency", "ToCurrency", "Rate", "LastUpdated"],
+  Budgets: ["BudgetID", "Period", "CategoryID", "UserID", "OwnershipType", "PlannedAmount", "Currency", "Notes"],
+  BudgetDetails: ["BudgetDetailID", "BudgetID", "CategoryID", "PlannedAmount", "ActualAmount", "Variance"],
+  Goals: ["GoalID", "GoalName", "TargetAmount", "CurrentAmount", "Currency", "TargetDate", "OwnerUserID", "OwnershipType", "Priority", "Status", "Notes"],
+  RecurringTransactions: ["RecurringID", "Title", "TransactionType", "AccountID", "TransferAccountID", "Amount", "Currency", "CategoryID", "SubCategoryID", "OwnerUserID", "OwnershipType", "Frequency", "StartDate", "EndDate", "NextDueDate", "LastExecutedDate", "AutoCreate", "Status", "Notes"],
+  Reminders: ["ReminderID", "Title", "Date", "Time", "Repeat", "Amount", "Currency", "UserID", "Priority", "Status", "Notes"],
+  Notifications: ["NotificationID", "Title", "Message", "Type", "Date", "IsRead"],
+  Assets: ["AssetID", "AssetName", "AssetType", "PurchaseDate", "PurchaseCost", "CurrentValue", "Currency", "OwnerUserID", "OwnershipType", "DepreciationRateAnnual", "Location", "Status", "Notes", "AttachmentID"],
+  AssetTransactions: ["AssetTxnID", "AssetID", "TransactionDate", "TransactionType", "Amount", "Currency", "Notes"],
+  Liabilities: ["LiabilityID", "LiabilityName", "LiabilityType", "Lender", "OriginalAmount", "OutstandingAmount", "InterestRate", "StartDate", "DueDate", "MonthlyPayment", "Currency", "OwnerUserID", "OwnershipType", "Status", "Notes"],
+  LiabilityTransactions: ["LiabilityTxnID", "LiabilityID", "TransactionDate", "PaymentAmount", "PrincipalPaid", "InterestPaid", "Currency"],
+  Investments: ["InvestmentID", "AccountID", "InvestmentName", "Symbol", "InvestmentType", "Quantity", "PurchasePrice", "CurrentPrice", "CostValue", "CurrentValue", "ProfitLoss", "ReturnPercentage", "Currency", "OwnerUserID", "OwnershipType", "PurchaseDate", "Status", "Notes"],
+  InvestmentTransactions: ["InvTxnID", "InvestmentID", "TransactionDate", "TransactionType", "Quantity", "Price", "Amount", "Currency"],
+  NetWorthSnapshots: ["SnapshotID", "Date", "TotalAssets", "TotalLiabilities", "NetWorth", "Currency", "OwnerUserID", "OwnershipType"],
+  Attachments: ["AttachmentID", "FileID", "FileName", "FileURL", "FileType", "UploadedBy", "UploadedDate"],
+  ImportLogs: ["ImportID", "FileName", "ImportDate", "RecordCount", "Status", "UploadedBy"]
+};
+
+function doGet(e) {
+  const action = e && e.parameter && e.parameter.action ? e.parameter.action : "ping";
+  if (action === "autoUpdateSchema" || action === "initSheets") {
+    return responseJSON(autoInitializeDatabase());
+  }
+  return responseJSON({ status: "success", message: "Apps Script Active" });
+}
+
+function doPost(e) {
+  let postData = {};
+  if (e && e.postData && e.postData.contents) postData = JSON.parse(e.postData.contents);
+  const action = postData.action || (e && e.parameter && e.parameter.action) || "sync";
+  if (action === "autoUpdateSchema" || action === "initSheets") {
+    return responseJSON(autoInitializeDatabase());
+  }
+  return responseJSON({ status: "success", message: "Processed" });
+}
+
+function autoInitializeDatabase() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const created = [], updated = [];
+  for (const sheetName in SCHEMA) {
+    const headers = SCHEMA[sheetName];
+    let sheet = ss.getSheetByName(sheetName);
+    if (!sheet) {
+      sheet = ss.insertSheet(sheetName);
+      created.push(sheetName);
+    } else {
+      updated.push(sheetName);
+    }
+    const lastCol = sheet.getLastColumn();
+    let curHeaders = lastCol > 0 ? sheet.getRange(1, 1, 1, lastCol).getValues()[0] : [];
+    if (curHeaders.length === 0 || (curHeaders.length === 1 && !curHeaders[0])) {
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      formatHeaders(sheet, headers.length);
+    } else {
+      const missing = headers.filter(h => !curHeaders.includes(h));
+      if (missing.length > 0) {
+        sheet.getRange(1, curHeaders.length + 1, 1, missing.length).setValues([missing]);
+        formatHeaders(sheet, curHeaders.length + missing.length);
+      }
+    }
+  }
+  return { status: "success", message: "All 27 sheets and headers auto-created!", createdSheets: created, updatedSheets: updated };
+}
+
+function formatHeaders(sheet, cols) {
+  if (cols <= 0) return;
+  const range = sheet.getRange(1, 1, 1, cols);
+  range.setBackground("#0d9488").setFontColor("#ffffff").setFontWeight("bold").setFontSize(10);
+  sheet.setFrozenRows(1);
+}
+
+function responseJSON(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}`;
+
+  const handleCopyScriptCode = () => {
+    navigator.clipboard.writeText(APPS_SCRIPT_SOURCE);
+    setCopiedScriptCode(true);
+    addToast('success', 'Script Code Copied', 'Paste this code into Google Sheets > Extensions > Apps Script.');
+    setTimeout(() => setCopiedScriptCode(false), 3000);
+  };
+
+  const handleAutoInitializeSheets = async () => {
+    if (!deploymentUrl) {
+      addToast('warning', 'Missing Apps Script Web App URL', 'Please enter your Apps Script Web App URL first.');
+      return;
+    }
+    setIsInitializingSheets(true);
+    try {
+      const response = await fetch(`${deploymentUrl}?action=autoUpdateSchema`);
+      const data = await response.json();
+      if (data.status === 'success') {
+        addToast('success', 'Sheets Auto-Created', data.message || 'All sheet tabs and headers created automatically!');
+      } else {
+        addToast('info', 'Schema Executed', 'Triggered sheet initialization on Apps Script Web App.');
+      }
+    } catch (err) {
+      addToast('info', 'Script Triggered', 'Web App requested. Check your Google Sheet to verify new tab headers.');
+    } finally {
+      setIsInitializingSheets(false);
+    }
+  };
+
+  // Footer Settings State
+  const [showFooter, setShowFooter] = useState(settings.ShowFooter !== false);
+  const [footerText, setFooterText] = useState(settings.FooterText || 'Couple Finance Suite');
+  const [footerCopyright, setFooterCopyright] = useState(settings.FooterCopyright || '© 2026 All Rights Reserved');
+  const [footerContactInfo, setFooterContactInfo] = useState(settings.FooterContactInfo || 'Support: support@couplefinance.app');
+
+  // Dashboard Cards, Charts, Tables Config State
+  const [dashboardConfig, setDashboardConfig] = useState(
+    settings.DashboardConfig || {
+      showKpis: true,
+      showNetWorthChart: true,
+      showIncomeExpenseChart: true,
+      showCategoryPieChart: true,
+      showAccountsWidget: true,
+      showRecentTransactionsTable: true,
+      showAssetLiabilityWidget: true,
+      showCapitalBreakdown: true,
+    }
+  );
+
+  // Page Headers & Subheadings Editor State
+  const [selectedHeaderPage, setSelectedHeaderPage] = useState<string>('dashboard');
+  const [pageHeadersState, setPageHeadersState] = useState<Record<string, { title: string; subtitle: string }>>(
+    settings.pageHeaders || {
+      dashboard: { title: 'Financial Dashboard & Overview', subtitle: 'Real-time performance metrics, net worth trajectory, and household cashflow analytics.' },
+      transactions: { title: 'Transaction Ledger & Cash Flow', subtitle: 'Detailed record of income, expenses, and inter-account transfers.' },
+      accounts: { title: 'Accounts & Capital Management', subtitle: 'Bank accounts, credit cards, investment portfolios, and digital wallets.' },
+      budgets: { title: 'Budget Planning & Targets', subtitle: 'Monthly spending caps and category threshold monitoring.' },
+      recurring: { title: 'Recurring Automation Engine', subtitle: 'Automate recurring salaries, rent cheques, utilities, and subscriptions.' },
+      reports: { title: 'Financial Intelligence & Reports', subtitle: 'Comprehensive statements, trend comparisons, and tax exports.' },
+      currencies: { title: 'Multi-Currency Exchange Rates', subtitle: 'Live foreign currencies and conversion parameters.' },
+      users: { title: 'User Profiles & Access', subtitle: 'Manage household members and permissions.' },
+      settings: { title: 'System Settings & Governance', subtitle: 'Configure detailed app preferences, branding, and layout controls.' },
+    }
+  );
 
   const [activeTab, setActiveTab] = useState<'general' | 'users' | 'roles' | 'categories' | 'currencies' | 'database' | 'audit'>('general');
 
@@ -95,8 +274,15 @@ export const SettingsPage: React.FC = () => {
           DecimalPlaces: Number(decimalPlaces),
           FiscalYearStartMonth: Number(fiscalYearMonth),
           LowBalanceThreshold: Number(lowBalanceThreshold),
+          SheetUrl: sheetUrl,
           SpreadsheetId: spreadsheetId,
           AppsScriptDeploymentUrl: deploymentUrl,
+          ShowFooter: showFooter,
+          FooterText: footerText,
+          FooterCopyright: footerCopyright,
+          FooterContactInfo: footerContactInfo,
+          DashboardConfig: dashboardConfig,
+          pageHeaders: pageHeadersState,
         });
       },
     });
@@ -421,6 +607,198 @@ export const SettingsPage: React.FC = () => {
             </div>
           </div>
 
+          {/* Footer Details Editor */}
+          <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700/60 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-2">
+              <h4 className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-2">
+                <Tag className="w-4 h-4 text-teal-600" /> Application Footer Details
+              </h4>
+              <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={showFooter}
+                  onChange={(e) => setShowFooter(e.target.checked)}
+                  className="w-4 h-4 text-teal-600 rounded"
+                />
+                Show Footer Bar
+              </label>
+            </div>
+
+            {showFooter && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                    Footer Brand Title
+                  </label>
+                  <input
+                    type="text"
+                    value={footerText}
+                    onChange={(e) => setFooterText(e.target.value)}
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white outline-none"
+                    placeholder="e.g. Couple Finance Suite"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                    Copyright Notice
+                  </label>
+                  <input
+                    type="text"
+                    value={footerCopyright}
+                    onChange={(e) => setFooterCopyright(e.target.value)}
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white outline-none"
+                    placeholder="e.g. © 2026 All Rights Reserved"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                    Contact Info / Support Text
+                  </label>
+                  <input
+                    type="text"
+                    value={footerContactInfo}
+                    onChange={(e) => setFooterContactInfo(e.target.value)}
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white outline-none"
+                    placeholder="e.g. support@couplefinance.app"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Dashboard Cards, Charts & Tables Layout Configuration */}
+          <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700/60 space-y-3">
+            <h4 className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-2 border-b border-slate-200 dark:border-slate-700 pb-2">
+              <Database className="w-4 h-4 text-teal-600" /> Dashboard Cards, Charts & Tables Visibility
+            </h4>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+              <label className="flex items-center gap-2 p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={dashboardConfig.showKpis !== false}
+                  onChange={(e) => setDashboardConfig((prev: any) => ({ ...prev, showKpis: e.target.checked }))}
+                  className="w-4 h-4 text-teal-600 rounded"
+                />
+                <span className="font-semibold text-slate-800 dark:text-slate-200">KPI Summary Cards</span>
+              </label>
+
+              <label className="flex items-center gap-2 p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={dashboardConfig.showIncomeExpenseChart !== false}
+                  onChange={(e) => setDashboardConfig((prev: any) => ({ ...prev, showIncomeExpenseChart: e.target.checked }))}
+                  className="w-4 h-4 text-teal-600 rounded"
+                />
+                <span className="font-semibold text-slate-800 dark:text-slate-200">Monthly Cash Flow Chart</span>
+              </label>
+
+              <label className="flex items-center gap-2 p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={dashboardConfig.showCategoryPieChart !== false}
+                  onChange={(e) => setDashboardConfig((prev: any) => ({ ...prev, showCategoryPieChart: e.target.checked }))}
+                  className="w-4 h-4 text-teal-600 rounded"
+                />
+                <span className="font-semibold text-slate-800 dark:text-slate-200">Expense Category Breakdown Pie</span>
+              </label>
+
+              <label className="flex items-center gap-2 p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={dashboardConfig.showAccountsWidget !== false}
+                  onChange={(e) => setDashboardConfig((prev: any) => ({ ...prev, showAccountsWidget: e.target.checked }))}
+                  className="w-4 h-4 text-teal-600 rounded"
+                />
+                <span className="font-semibold text-slate-800 dark:text-slate-200">Contribution Breakdown</span>
+              </label>
+
+              <label className="flex items-center gap-2 p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={dashboardConfig.showRecentTransactionsTable !== false}
+                  onChange={(e) => setDashboardConfig((prev: any) => ({ ...prev, showRecentTransactionsTable: e.target.checked }))}
+                  className="w-4 h-4 text-teal-600 rounded"
+                />
+                <span className="font-semibold text-slate-800 dark:text-slate-200">Recent Transactions Table</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Page Headers & Subheadings Customization */}
+          <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700/60 space-y-3">
+            <h4 className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-2 border-b border-slate-200 dark:border-slate-700 pb-2">
+              <Edit className="w-4 h-4 text-teal-600" /> Page Titles & Subheadings Customization
+            </h4>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                  Select Page to Edit Header Text
+                </label>
+                <select
+                  value={selectedHeaderPage}
+                  onChange={(e) => setSelectedHeaderPage(e.target.value)}
+                  className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white outline-none"
+                >
+                  <option value="dashboard">Dashboard Overview</option>
+                  <option value="transactions">Transactions Ledger</option>
+                  <option value="accounts">Accounts & Balances</option>
+                  <option value="budgets">Budgets & Targets</option>
+                  <option value="recurring">Recurring Automation Rules</option>
+                  <option value="reports">Financial Intelligence & Reports</option>
+                  <option value="currencies">Multi-Currency Rates</option>
+                  <option value="users">Users & Access Control</option>
+                  <option value="settings">Settings & Governance</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                    Page Main Title
+                  </label>
+                  <input
+                    type="text"
+                    value={pageHeadersState[selectedHeaderPage]?.title || ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setPageHeadersState((prev) => ({
+                        ...prev,
+                        [selectedHeaderPage]: {
+                          title: val,
+                          subtitle: prev[selectedHeaderPage]?.subtitle || '',
+                        },
+                      }));
+                    }}
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                    Page Subheading / Description
+                  </label>
+                  <input
+                    type="text"
+                    value={pageHeadersState[selectedHeaderPage]?.subtitle || ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setPageHeadersState((prev) => ({
+                        ...prev,
+                        [selectedHeaderPage]: {
+                          title: prev[selectedHeaderPage]?.title || '',
+                          subtitle: val,
+                        },
+                      }));
+                    }}
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="pt-3 flex justify-end">
             <button
               type="submit"
@@ -736,50 +1114,125 @@ export const SettingsPage: React.FC = () => {
 
       {/* Tab 6: Google Sheets DB */}
       {activeTab === 'database' && (
-        <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-4 max-w-2xl text-xs sm:text-sm">
-          <h3 className="font-bold text-slate-900 dark:text-white text-base">Google Sheets DB Persistence</h3>
-          <p className="text-xs text-slate-500">
-            Link your Google Sheet and Apps Script web app URL to auto-sync transactions to cloud spreadsheets.
-          </p>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
-              Google Spreadsheet ID
-            </label>
-            <input
-              type="text"
-              placeholder="1A2b3C4d5E..."
-              value={spreadsheetId}
-              onChange={(e) => setSpreadsheetId(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs outline-none"
-            />
+        <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-5 max-w-3xl text-xs sm:text-sm">
+          <div className="border-b border-slate-100 dark:border-slate-800 pb-3 flex justify-between items-start">
+            <div>
+              <h3 className="font-bold text-slate-900 dark:text-white text-base flex items-center gap-2">
+                <FileSpreadsheet className="w-5 h-5 text-teal-600" /> Google Sheets & Apps Script DB Engine
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">
+                Link your Google Sheet and Apps Script web app URL. All 27 sheets and their column headers can be created automatically without manual setup!
+              </p>
+            </div>
+            {spreadsheetId && (
+              <a
+                href={`https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`}
+                target="_blank"
+                rel="noreferrer"
+                className="px-3 py-1.5 bg-teal-50 dark:bg-teal-950/50 hover:bg-teal-100 dark:hover:bg-teal-900/60 text-teal-700 dark:text-teal-300 font-bold rounded-xl text-xs flex items-center gap-1.5 border border-teal-200 dark:border-teal-800 shrink-0"
+              >
+                <ExternalLink className="w-3.5 h-3.5" /> Open Google Sheet
+              </a>
+            )}
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
-              Apps Script Deployment Web App URL
-            </label>
-            <input
-              type="text"
-              placeholder="https://script.google.com/macros/s/..."
-              value={deploymentUrl}
-              onChange={(e) => setDeploymentUrl(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs outline-none"
-            />
+          {/* Editable Sheet URL & Auto Parsed Spreadsheet ID */}
+          <div className="space-y-3 p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700/60">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5 text-teal-600" /> Google Sheet URL (Editable)
+              </label>
+              <input
+                type="text"
+                placeholder="https://docs.google.com/spreadsheets/d/1A2b3C4d5E.../edit"
+                value={sheetUrl}
+                onChange={(e) => handleSheetUrlChange(e.target.value)}
+                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs outline-none text-slate-900 dark:text-white font-mono"
+              />
+              <p className="text-[11px] text-slate-500 mt-1">
+                Paste the complete URL of your Google Sheet. The Spreadsheet ID will be extracted automatically.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                Extracted Spreadsheet ID
+              </label>
+              <input
+                type="text"
+                placeholder="Auto-extracted ID e.g. 1A2b3C4d5E..."
+                value={spreadsheetId}
+                onChange={(e) => setSpreadsheetId(e.target.value)}
+                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs outline-none font-mono font-bold text-teal-700 dark:text-teal-400"
+              />
+            </div>
+          </div>
+
+          {/* Apps Script Deployment Web App URL & Auto Update Controls */}
+          <div className="space-y-3 p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700/60">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
+                <Zap className="w-3.5 h-3.5 text-amber-500" /> Google Apps Script Web App Deployment URL
+              </label>
+              <input
+                type="text"
+                placeholder="https://script.google.com/macros/s/AKfycbx.../exec"
+                value={deploymentUrl}
+                onChange={(e) => setDeploymentUrl(e.target.value)}
+                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs outline-none text-slate-900 dark:text-white font-mono"
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={handleAutoInitializeSheets}
+                disabled={isInitializingSheets}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white rounded-xl font-bold text-xs shadow-sm"
+              >
+                {isInitializingSheets ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+                <span>⚡ Auto-Create / Update All Sheets & Headers</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCopyScriptCode}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold text-xs shadow-sm"
+              >
+                {copiedScriptCode ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                <span>{copiedScriptCode ? 'Script Copied!' : '📋 Copy Apps Script Source Code'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Instructions Box */}
+          <div className="p-4 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-200 dark:border-amber-800/50 space-y-2 text-xs text-amber-900 dark:text-amber-200">
+            <h4 className="font-bold flex items-center gap-1.5 text-xs text-amber-800 dark:text-amber-300">
+              <AlertTriangle className="w-4 h-4 text-amber-600" /> Quick 2-Minute Setup Instructions:
+            </h4>
+            <ol className="list-decimal list-inside space-y-1 text-[11px] leading-relaxed text-amber-900/90 dark:text-amber-200/90">
+              <li>Open your Google Sheet and click <strong>Extensions &gt; Apps Script</strong>.</li>
+              <li>Click <strong>📋 Copy Apps Script Source Code</strong> above and paste it into the editor.</li>
+              <li>Click <strong>Deploy &gt; New deployment &gt; Web app</strong>. Set <em>Execute as: Me</em> and <em>Who has access: Anyone</em>.</li>
+              <li>Copy the Web App URL and paste it into the field above, then click <strong>⚡ Auto-Create / Update All Sheets & Headers</strong>.</li>
+              <li>All 27 sheet tabs and frozen headers will be created automatically!</li>
+            </ol>
           </div>
 
           <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
             <button
+              type="button"
               onClick={handleExportBackup}
               className="flex items-center gap-1.5 px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 font-bold rounded-xl text-xs"
             >
-              <Download className="w-4 h-4" /> Download JSON Backup
+              <Download className="w-4 h-4" /> Download Local JSON Backup
             </button>
             <button
+              type="button"
               onClick={handleSaveGeneral}
-              className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl text-xs shadow-md shadow-teal-600/20"
+              className="flex items-center gap-1.5 px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl text-xs shadow-md shadow-teal-600/20"
             >
-              <Save className="w-4 h-4" /> Save DB Settings
+              <Save className="w-4 h-4" /> Save Sheet & DB Settings
             </button>
           </div>
         </div>

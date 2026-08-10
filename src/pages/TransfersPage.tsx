@@ -13,10 +13,9 @@ import {
   Wallet,
   ArrowRight,
   RefreshCw,
-  Trash2,
+  XCircle,
   Edit2,
   CheckCircle2,
-  XCircle,
 } from 'lucide-react';
 
 export const TransfersPage: React.FC = () => {
@@ -31,6 +30,8 @@ export const TransfersPage: React.FC = () => {
     convertCurrency,
     addToast,
     currentUser,
+    requestConfirmation,
+    cancelTransaction,
   } = useFinance();
 
   // New Transfer Form State
@@ -414,15 +415,23 @@ export const TransfersPage: React.FC = () => {
                       <td className="py-3 px-3 text-right whitespace-nowrap">
                         <button
                           onClick={() => {
-                            if (confirm('Delete this transfer record?')) {
-                              deleteTransaction(t.TransactionID);
-                              addToast('info', 'Transfer Removed', 'Transfer record deleted.');
-                            }
+                            requestConfirmation({
+                              title: 'Cancel Transfer Entry',
+                              message: `Are you sure you want to cancel transfer "${t.Description}"? This action will reverse balance impacts.`,
+                              actionType: 'CancelAction',
+                              confirmText: 'Cancel Transfer',
+                              cancelText: 'Keep Transfer',
+                              onConfirm: () => {
+                                cancelTransaction(t.TransactionID);
+                                addToast('info', 'Transfer Cancelled', 'Transfer entry has been cancelled.');
+                              },
+                            });
                           }}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
-                          title="Delete Transfer"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors flex items-center gap-1 font-semibold text-xs ml-auto"
+                          title="Cancel Transfer"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <XCircle className="w-4 h-4 text-rose-500" />
+                          <span>Cancel</span>
                         </button>
                       </td>
                     </tr>

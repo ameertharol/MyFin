@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
+import { defaultFullPermissions, getCompletePermissions } from '../utils/permissionUtils';
 import {
   User,
   Role,
@@ -177,7 +178,7 @@ interface FinanceContextType {
 
   // Recurring Transactions Engine
   addRecurringTransaction: (recurring: Omit<RecurringTransaction, 'RecurringID'>) => void;
-  finalizeRecurringTransaction: (recurringId: string) => void;
+  finalizeRecurringTransaction: (recurringId: string, overrideAccountId?: string) => void;
   updateRecurringStatus: (recurringId: string, status: RecurringTransaction['Status']) => void;
   deleteRecurringTransaction: (recurringId: string) => void;
 
@@ -355,13 +356,13 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   // Current User Permissions derived from Role Group
   const currentPermissions: RoleGroup['Permissions'] = useMemo(() => {
     const group = roleGroups.find((g) => g.GroupID === currentUser.RoleID || g.GroupName.toLowerCase().includes(currentUser.RoleID.toLowerCase()));
-    if (group) return group.Permissions;
+    if (group) return getCompletePermissions(group.Permissions);
 
-    // Fallback: Admin or full permissions for admin user, Partner permissions for partner
+    // Fallback: Admin or full permissions for admin user
     if (currentUser.RoleID === 'ROLE-ADMIN' || currentUser.RoleID === 'Admin') {
-      return { canCreate: true, canEdit: true, canDelete: true, canCancel: true, canViewReports: true, canManageSettings: true };
+      return defaultFullPermissions;
     }
-    return { canCreate: true, canEdit: true, canDelete: false, canCancel: true, canViewReports: true, canManageSettings: false };
+    return getCompletePermissions({ canCreate: true, canEdit: true, canDelete: false, canCancel: true, canViewReports: true, canManageSettings: false });
   }, [currentUser, roleGroups]);
 
   const addRoleGroup = (group: RoleGroup) => {
@@ -1053,10 +1054,11 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     addToast('success', 'Recurring Created', `Recurring transaction "${titleText}" added.`);
   };
 
-  const finalizeRecurringTransaction = (recurringId: string) => {
+  const finalizeRecurringTransaction = (recurringId: string, overrideAccountId?: string) => {
     const rec = recurring.find((r) => r.RecurringID === recurringId);
     if (!rec) return;
 
+    const targetAccId = overrideAccountId || rec.AccountID;
     const todayStr = new Date().toISOString().substring(0, 10);
 
     const txnId = 'TXN-' + Math.floor(100000 + Math.random() * 900000);
@@ -1064,7 +1066,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       TransactionID: txnId,
       Date: rec.NextDueDate || todayStr,
       TransactionType: rec.TransactionType || (rec as any).Type || 'Expense',
-      AccountID: rec.AccountID,
+      AccountID: targetAccId,
       TransferAccountID: rec.TransferAccountID,
       Amount: rec.Amount,
       Currency: rec.Currency,

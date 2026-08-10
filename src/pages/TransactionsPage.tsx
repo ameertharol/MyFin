@@ -43,7 +43,13 @@ export const TransactionsPage: React.FC = () => {
     filters,
     setFilters,
     addToast,
+    settings,
   } = useFinance();
+
+  const headerInfo = settings.pageHeaders?.['transactions'] || {
+    title: 'Transaction Management',
+    subtitle: 'View, search, filter and manage income, expenses & transfers',
+  };
 
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [selectedTxn, setSelectedTxn] = useState<Transaction | null>(null);
@@ -154,8 +160,8 @@ export const TransactionsPage: React.FC = () => {
       {/* Header Toolbar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white">Transaction Management</h2>
-          <p className="text-xs text-slate-500">View, search, filter and manage income, expenses & transfers</p>
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white">{headerInfo.title}</h2>
+          <p className="text-xs text-slate-500">{headerInfo.subtitle}</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
