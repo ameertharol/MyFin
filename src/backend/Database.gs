@@ -1,6 +1,49 @@
 /**
  * Couple Finance - Database Schema Engine & Utilities
  */
+
+// 1. AUTOMATIC CUSTOM MENU IN GOOGLE SHEETS
+function onOpen(e) {
+  try {
+    SpreadsheetApp.getUi()
+      .createMenu('⚡ Couple Finance')
+      .addItem('⚡ Auto-Create All 27 Sheets & Headers', 'setupAllSheetsManual')
+      .addItem('🌱 Seed Initial Categories & Default Data', 'seedDefaultDatabaseData')
+      .addItem('🔍 Check Database Health & Schema', 'checkDatabaseHealth')
+      .addToUi();
+  } catch (err) {
+    Logger.log('onOpen Menu Error: ' + err);
+  }
+}
+
+function onInstall(e) {
+  onOpen(e);
+}
+
+// 2. MAIN MANUAL RUN FUNCTION (SELECT THIS IN APPS SCRIPT EDITOR & CLICK "RUN")
+function setupAllSheetsManual() {
+  const result = autoInitializeDatabase();
+  Logger.log(JSON.stringify(result, null, 2));
+  try {
+    SpreadsheetApp.getUi().alert('Success! ' + result.message);
+  } catch (e) {
+    // Called outside sheet UI
+  }
+}
+
+function checkDatabaseHealth() {
+  const ss = getSpreadsheet();
+  const sheets = ss.getSheets().map(s => s.getName());
+  const missing = [];
+  for (const sheetName in SCHEMA) {
+    if (!sheets.includes(sheetName)) missing.push(sheetName);
+  }
+  const msg = missing.length === 0 
+    ? 'All 27 required sheets are present in this spreadsheet!'
+    : 'Missing ' + missing.length + ' sheets: ' + missing.join(', ');
+  try { SpreadsheetApp.getUi().alert(msg); } catch (e) { Logger.log(msg); }
+}
+
 const SCHEMA = {
   Users: [
     "UserID", "Username", "Password", "FullName", "Email", "Phone",
@@ -111,12 +154,21 @@ const SCHEMA = {
   ]
 };
 
-function getSpreadsheet() {
-  return SpreadsheetApp.getActiveSpreadsheet();
+function getSpreadsheet(optSpreadsheetId) {
+  if (optSpreadsheetId) {
+    try {
+      return SpreadsheetApp.openById(optSpreadsheetId);
+    } catch (e) {
+      Logger.log("Could not open spreadsheet by ID: " + e);
+    }
+  }
+  const active = SpreadsheetApp.getActiveSpreadsheet();
+  if (active) return active;
+  throw new Error("No active spreadsheet found. Make sure script was opened via Extensions > Apps Script inside your Google Sheet, or pass spreadsheetId.");
 }
 
-function getSheet(sheetName) {
-  const ss = getSpreadsheet();
+function getSheet(sheetName, optSpreadsheetId) {
+  const ss = getSpreadsheet(optSpreadsheetId);
   let sheet = ss.getSheetByName(sheetName);
   if (!sheet) {
     sheet = ss.insertSheet(sheetName);
@@ -128,8 +180,8 @@ function getSheet(sheetName) {
  * Automatically creates all sheets and headers defined in SCHEMA.
  * Formats headers with frozen top row and styling.
  */
-function autoInitializeDatabase() {
-  const ss = getSpreadsheet();
+function autoInitializeDatabase(optSpreadsheetId) {
+  const ss = getSpreadsheet(optSpreadsheetId);
   const createdSheets = [];
   const updatedSheets = [];
 

@@ -16,7 +16,8 @@ function doGet(e) {
     }
 
     if (action === "autoUpdateSchema" || action === "initSheets") {
-      const result = autoInitializeDatabase();
+      const sid = (e && e.parameter) ? e.parameter.spreadsheetId : undefined;
+      const result = autoInitializeDatabase(sid);
       return responseJSON(result);
     }
 
@@ -50,9 +51,10 @@ function doPost(e) {
     }
 
     const action = postData.action || (e && e.parameter && e.parameter.action) || "sync";
+    const sid = postData.spreadsheetId || (e && e.parameter && e.parameter.spreadsheetId) || undefined;
 
     if (action === "autoUpdateSchema" || action === "initSheets") {
-      const result = autoInitializeDatabase();
+      const result = autoInitializeDatabase(sid);
       return responseJSON(result);
     }
 

@@ -83,9 +83,52 @@ export const SettingsPage: React.FC = () => {
   };
 
   const APPS_SCRIPT_SOURCE = `/**
- * Couple Finance - Google Apps Script Automation Backend
- * Auto-creates all required sheet tabs & populates column headers automatically
+ * Couple Finance - Google Apps Script Automation & DB Engine
+ * Automatically creates all 27 sheet tabs & populates styled column headers
  */
+
+// 1. AUTOMATIC CUSTOM MENU IN GOOGLE SHEETS
+function onOpen(e) {
+  try {
+    SpreadsheetApp.getUi()
+      .createMenu('⚡ Couple Finance')
+      .addItem('⚡ Auto-Create All 27 Sheets & Headers', 'setupAllSheetsManual')
+      .addItem('🌱 Seed Initial Categories & Default Data', 'seedDefaultDatabaseData')
+      .addItem('🔍 Check Database Health & Schema', 'checkDatabaseHealth')
+      .addToUi();
+  } catch (err) {
+    Logger.log('onOpen Menu Error: ' + err);
+  }
+}
+
+function onInstall(e) {
+  onOpen(e);
+}
+
+// 2. MAIN MANUAL RUN FUNCTION (SELECT THIS IN APPS SCRIPT EDITOR & CLICK "RUN")
+function setupAllSheetsManual() {
+  const result = autoInitializeDatabase();
+  Logger.log(JSON.stringify(result, null, 2));
+  try {
+    SpreadsheetApp.getUi().alert('Success! ' + result.message);
+  } catch (e) {
+    // Called outside sheet UI
+  }
+}
+
+function checkDatabaseHealth() {
+  const ss = getSpreadsheet();
+  const sheets = ss.getSheets().map(s => s.getName());
+  const missing = [];
+  for (const sheetName in SCHEMA) {
+    if (!sheets.includes(sheetName)) missing.push(sheetName);
+  }
+  const msg = missing.length === 0 
+    ? 'All 27 required sheets are present in this spreadsheet!'
+    : 'Missing ' + missing.length + ' sheets: ' + missing.join(', ');
+  try { SpreadsheetApp.getUi().alert(msg); } catch (e) { Logger.log(msg); }
+}
+
 const SCHEMA = {
   Users: ["UserID", "Username", "Password", "FullName", "Email", "Phone", "RoleID", "PartnerID", "DefaultCurrency", "Status", "CreatedDate", "UpdatedDate", "LastLogin"],
   Roles: ["RoleID", "RoleName", "Description", "Permissions", "CreatedDate"],
@@ -119,26 +162,17 @@ const SCHEMA = {
   ImportLogs: ["ImportID", "FileName", "ImportDate", "RecordCount", "Status", "UploadedBy"]
 };
 
-function doGet(e) {
-  const action = e && e.parameter && e.parameter.action ? e.parameter.action : "ping";
-  if (action === "autoUpdateSchema" || action === "initSheets") {
-    return responseJSON(autoInitializeDatabase());
+function getSpreadsheet(optSpreadsheetId) {
+  if (optSpreadsheetId) {
+    try { return SpreadsheetApp.openById(optSpreadsheetId); } catch (err) {}
   }
-  return responseJSON({ status: "success", message: "Apps Script Active" });
-}
-
-function doPost(e) {
-  let postData = {};
-  if (e && e.postData && e.postData.contents) postData = JSON.parse(e.postData.contents);
-  const action = postData.action || (e && e.parameter && e.parameter.action) || "sync";
-  if (action === "autoUpdateSchema" || action === "initSheets") {
-    return responseJSON(autoInitializeDatabase());
-  }
-  return responseJSON({ status: "success", message: "Processed" });
-}
-
-function autoInitializeDatabase() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (ss) return ss;
+  throw new Error("Could not find active Google Sheet.");
+}
+
+function autoInitializeDatabase(optSpreadsheetId) {
+  const ss = getSpreadsheet(optSpreadsheetId);
   const created = [], updated = [];
   for (const sheetName in SCHEMA) {
     const headers = SCHEMA[sheetName];
@@ -172,6 +206,28 @@ function formatHeaders(sheet, cols) {
   sheet.setFrozenRows(1);
 }
 
+function doGet(e) {
+  const action = e && e.parameter && e.parameter.action ? e.parameter.action : "ping";
+  const sid = e && e.parameter ? e.parameter.spreadsheetId : undefined;
+  if (action === "autoUpdateSchema" || action === "initSheets") {
+    return responseJSON(autoInitializeDatabase(sid));
+  }
+  return responseJSON({ status: "success", message: "Couple Finance Apps Script Active" });
+}
+
+function doPost(e) {
+  let postData = {};
+  if (e && e.postData && e.postData.contents) {
+    try { postData = JSON.parse(e.postData.contents); } catch (err) {}
+  }
+  const action = postData.action || (e && e.parameter && e.parameter.action) || "sync";
+  const sid = postData.spreadsheetId || (e && e.parameter && e.parameter.spreadsheetId) || undefined;
+  if (action === "autoUpdateSchema" || action === "initSheets") {
+    return responseJSON(autoInitializeDatabase(sid));
+  }
+  return responseJSON({ status: "success", message: "Processed" });
+}
+
 function responseJSON(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }`;
@@ -185,20 +241,21 @@ function responseJSON(obj) {
 
   const handleAutoInitializeSheets = async () => {
     if (!deploymentUrl) {
-      addToast('warning', 'Missing Apps Script Web App URL', 'Please enter your Apps Script Web App URL first.');
+      addToast('warning', 'Missing Web App URL', 'Please enter your Web App URL, or run "setupAllSheetsManual" inside Apps Script Editor.');
       return;
     }
     setIsInitializingSheets(true);
     try {
-      const response = await fetch(`${deploymentUrl}?action=autoUpdateSchema`);
+      const url = `${deploymentUrl}?action=autoUpdateSchema&spreadsheetId=${encodeURIComponent(spreadsheetId)}`;
+      const response = await fetch(url, { mode: 'cors', redirect: 'follow' });
       const data = await response.json();
       if (data.status === 'success') {
-        addToast('success', 'Sheets Auto-Created', data.message || 'All sheet tabs and headers created automatically!');
+        addToast('success', 'Sheets Auto-Created!', data.message || 'All 27 sheet tabs and headers created automatically.');
       } else {
-        addToast('info', 'Schema Executed', 'Triggered sheet initialization on Apps Script Web App.');
+        addToast('info', 'Web App Triggered', 'Request sent to Google Apps Script.');
       }
     } catch (err) {
-      addToast('info', 'Script Triggered', 'Web App requested. Check your Google Sheet to verify new tab headers.');
+      addToast('info', 'Sync Triggered', 'Web App requested. You can also click "⚡ Couple Finance" menu directly in Google Sheets!');
     } finally {
       setIsInitializingSheets(false);
     }
@@ -1206,16 +1263,22 @@ function responseJSON(obj) {
           </div>
 
           {/* Instructions Box */}
-          <div className="p-4 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-200 dark:border-amber-800/50 space-y-2 text-xs text-amber-900 dark:text-amber-200">
+          <div className="p-4 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-200 dark:border-amber-800/50 space-y-3 text-xs text-amber-900 dark:text-amber-200">
             <h4 className="font-bold flex items-center gap-1.5 text-xs text-amber-800 dark:text-amber-300">
-              <AlertTriangle className="w-4 h-4 text-amber-600" /> Quick 2-Minute Setup Instructions:
+              <AlertTriangle className="w-4 h-4 text-amber-600" /> Complete Setup & 1-Click Sheet Tab Auto-Creation:
             </h4>
-            <ol className="list-decimal list-inside space-y-1 text-[11px] leading-relaxed text-amber-900/90 dark:text-amber-200/90">
+            <ol className="list-decimal list-inside space-y-2 text-[11px] leading-relaxed text-amber-900/90 dark:text-amber-200/90">
               <li>Open your Google Sheet and click <strong>Extensions &gt; Apps Script</strong>.</li>
-              <li>Click <strong>📋 Copy Apps Script Source Code</strong> above and paste it into the editor.</li>
-              <li>Click <strong>Deploy &gt; New deployment &gt; Web app</strong>. Set <em>Execute as: Me</em> and <em>Who has access: Anyone</em>.</li>
-              <li>Copy the Web App URL and paste it into the field above, then click <strong>⚡ Auto-Create / Update All Sheets & Headers</strong>.</li>
-              <li>All 27 sheet tabs and frozen headers will be created automatically!</li>
+              <li>Click <strong>📋 Copy Apps Script Source Code</strong> above and paste it into the Apps Script editor (replace any existing code). Save with <strong>Ctrl+S / Cmd+S</strong>.</li>
+              <li className="p-2 bg-amber-100/70 dark:bg-amber-900/40 rounded-lg font-medium border border-amber-300 dark:border-amber-700">
+                <strong>⚡ Instant Creation Method 1 (Inside Apps Script Editor):</strong> At the top toolbar of Apps Script, select <code>setupAllSheetsManual</code> from the dropdown list next to "Debug / Run", then click <strong>Run▶</strong>. Grant permissions when prompted ("Review Permissions &gt; Allow"). All 27 sheets will be created immediately!
+              </li>
+              <li className="p-2 bg-amber-100/70 dark:bg-amber-900/40 rounded-lg font-medium border border-amber-300 dark:border-amber-700">
+                <strong>⚡ Instant Creation Method 2 (Inside Google Sheets):</strong> Reload your Google Sheet page. You will see a new menu at the top: <strong>⚡ Couple Finance</strong> &gt; click <strong>⚡ Auto-Create All 27 Sheets & Headers</strong>.
+              </li>
+              <li>
+                <strong>Web App Sync (Optional):</strong> Click <strong>Deploy &gt; New deployment &gt; Web app</strong>. Set <em>Execute as: Me</em> and <em>Who has access: Anyone</em>. Copy the Web App URL and paste it into the field above for live background syncing!
+              </li>
             </ol>
           </div>
 
