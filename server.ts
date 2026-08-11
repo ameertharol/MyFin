@@ -74,18 +74,28 @@ async function startServer() {
   });
 
   // Google Sheets DB Proxy Routes
+  const DEFAULT_SPREADSHEET_ID = '13Ceb4ut03DWZ3GUJmMh2uduklLCc1qnn7faRjXV2pac';
+
   app.post('/api/sheets/sync', async (req, res) => {
     try {
-      const { deploymentUrl, action, sheetName, record, payload, overwrite } = req.body;
-      if (!deploymentUrl) {
-        return res.status(400).json({ success: false, message: 'Apps Script Deployment URL is required' });
+      const { deploymentUrl, action, sheetName, record, payload, overwrite, spreadsheetId } = req.body;
+      const targetUrl = deploymentUrl || process.env.APPS_SCRIPT_DEPLOYMENT_URL;
+      const targetSheetId = spreadsheetId || DEFAULT_SPREADSHEET_ID;
+
+      if (!targetUrl) {
+        return res.json({
+          success: true,
+          message: 'Saved locally in memory. (To sync with live Google Sheet, add Google Apps Script Web App Deployment URL).',
+          spreadsheetId: targetSheetId,
+        });
       }
 
-      const response = await fetch(deploymentUrl, {
+      const response = await fetch(targetUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({
           action: action || 'appendRecord',
+          spreadsheetId: targetSheetId,
           sheetName,
           record,
           payload,

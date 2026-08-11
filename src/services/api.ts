@@ -117,13 +117,13 @@ export const apiService = {
 
   // Sync single record to Google Sheet
   async syncRecordToSheet(deploymentUrl: string, sheetName: string, record: Record<string, any>) {
-    if (!deploymentUrl) return null;
     try {
       const res = await fetch('/api/sheets/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          deploymentUrl,
+          deploymentUrl: deploymentUrl || '',
+          spreadsheetId: '13Ceb4ut03DWZ3GUJmMh2uduklLCc1qnn7faRjXV2pac',
           action: 'appendRecord',
           sheetName,
           record,
@@ -131,6 +131,7 @@ export const apiService = {
       });
       return await res.json();
     } catch (e) {
+      if (!deploymentUrl) return { success: false, message: (e as Error).message };
       // Fallback: direct browser fetch
       try {
         const directRes = await fetch(deploymentUrl, {
@@ -138,6 +139,7 @@ export const apiService = {
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify({
             action: 'appendRecord',
+            spreadsheetId: '13Ceb4ut03DWZ3GUJmMh2uduklLCc1qnn7faRjXV2pac',
             sheetName,
             record,
           }),

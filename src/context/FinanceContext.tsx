@@ -767,19 +767,18 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   // Google Sheets Auto Sync Helper
   const syncToSheet = (sheetName: string, record: Record<string, any>) => {
-    if (settings.AppsScriptDeploymentUrl && settings.AppsScriptDeploymentUrl.trim().startsWith('http')) {
-      apiService.syncRecordToSheet(settings.AppsScriptDeploymentUrl.trim(), sheetName, record)
-        .then((res) => {
-          if (res && res.success) {
-            console.log(`[Google Sheet Sync] Successfully appended record to ${sheetName}`);
-          } else {
-            console.warn(`[Google Sheet Sync] Notice appending to ${sheetName}:`, res?.message);
-          }
-        })
-        .catch((err) => {
-          console.error(`[Google Sheet Sync] Error syncing to ${sheetName}:`, err);
-        });
-    }
+    const deployUrl = settings.AppsScriptDeploymentUrl?.trim() || '';
+    apiService.syncRecordToSheet(deployUrl, sheetName, record)
+      .then((res) => {
+        if (res && res.success) {
+          console.log(`[Google Sheet Sync] Successfully synced record to ${sheetName}`);
+        } else {
+          console.warn(`[Google Sheet Sync] Notice syncing to ${sheetName}:`, res?.message);
+        }
+      })
+      .catch((err) => {
+        console.error(`[Google Sheet Sync] Error syncing to ${sheetName}:`, err);
+      });
   };
 
   const syncAllToGoogleSheet = async (overwrite: boolean = false) => {
@@ -859,14 +858,12 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     const existingTxn = transactions.find((t) => t.TransactionID === transactionId);
     if (!existingTxn) return;
     const oldStatus = existingTxn.Status;
+    const updatedTxn = { ...existingTxn, Status: status, UpdatedBy: currentUser.UserID, UpdatedDate: new Date().toISOString().substring(0, 10) };
 
     setTransactions((prev) =>
-      prev.map((t) =>
-        t.TransactionID === transactionId
-          ? { ...t, Status: status, UpdatedBy: currentUser.UserID, UpdatedDate: new Date().toISOString().substring(0, 10) }
-          : t
-      )
+      prev.map((t) => (t.TransactionID === transactionId ? updatedTxn : t))
     );
+    syncToSheet('Transactions', updatedTxn);
 
     const undoFn = () => {
       setTransactions((prev) =>
@@ -889,6 +886,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     if (!existingTxn) return;
 
     setTransactions((prev) => prev.filter((t) => t.TransactionID !== transactionId));
+    syncToSheet('Transactions', { ...existingTxn, Status: 'Deleted', UpdatedDate: new Date().toISOString().substring(0, 10) });
 
     const undoFn = () => {
       setTransactions((prev) => [existingTxn, ...prev]);

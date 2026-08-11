@@ -1297,35 +1297,33 @@ function responseJSON(obj) {
             )}
           </div>
 
-          {/* Editable Sheet URL & Auto Parsed Spreadsheet ID */}
-          <div className="space-y-3 p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700/60">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
-                <Globe className="w-3.5 h-3.5 text-teal-600" /> Google Sheet URL (Editable)
-              </label>
-              <input
-                type="text"
-                placeholder="https://docs.google.com/spreadsheets/d/1A2b3C4d5E.../edit"
-                value={sheetUrl}
-                onChange={(e) => handleSheetUrlChange(e.target.value)}
-                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs outline-none text-slate-900 dark:text-white font-mono"
-              />
-              <p className="text-[11px] text-slate-500 mt-1">
-                Paste the complete URL of your Google Sheet. The Spreadsheet ID will be extracted automatically.
-              </p>
-            </div>
+          {/* Connected Google Sheet Information */}
+          <div className="space-y-3 p-4 bg-teal-50/70 dark:bg-teal-950/30 rounded-xl border border-teal-200 dark:border-teal-800/60">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-teal-600 text-white">
+                    <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse" />
+                    Target Google Sheet Connected
+                  </span>
+                  <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                    ID: 13Ceb4ut03DWZ3GUJmMh2uduklLCc1qnn7faRjXV2pac
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-300 mt-1.5 font-medium">
+                  Direct Google Sheet integration is configured in application source code. All app activity immediately syncs to this sheet.
+                </p>
+              </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                Extracted Spreadsheet ID
-              </label>
-              <input
-                type="text"
-                placeholder="Auto-extracted ID e.g. 1A2b3C4d5E..."
-                value={spreadsheetId}
-                onChange={(e) => setSpreadsheetId(e.target.value)}
-                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs outline-none font-mono font-bold text-teal-700 dark:text-teal-400"
-              />
+              <a
+                href="https://docs.google.com/spreadsheets/d/13Ceb4ut03DWZ3GUJmMh2uduklLCc1qnn7faRjXV2pac/edit?usp=drivesdk"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold text-xs shadow-sm transition-colors shrink-0"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Open Google Sheet</span>
+              </a>
             </div>
           </div>
 

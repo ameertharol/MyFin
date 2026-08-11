@@ -421,7 +421,7 @@ export const initialSettings: Settings = {
   BudgetAlert90: true,
   BudgetAlert100: true,
   LowBalanceThreshold: 1000,
-  SpreadsheetId: '',
+  SpreadsheetId: '13Ceb4ut03DWZ3GUJmMh2uduklLCc1qnn7faRjXV2pac',
   AppsScriptDeploymentUrl: '',
   DemoDataEnabled: false,
   DashboardConfig: {
