@@ -88,12 +88,80 @@ export const apiService = {
   },
 
   // Run Apps Script Installation / Sheet Database Provisioning
-  async triggerGoogleSheetInstall(spreadsheetId: string) {
+  async triggerGoogleSheetInstall(deploymentUrl: string, spreadsheetId?: string) {
     try {
       const res = await fetch('/api/sheets/install', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ spreadsheetId }),
+        body: JSON.stringify({ deploymentUrl, spreadsheetId }),
+      });
+      return await res.json();
+    } catch (e) {
+      return { success: false, message: (e as Error).message };
+    }
+  },
+
+  // Ping / Test connection to Google Apps Script Web App
+  async pingGoogleSheet(deploymentUrl: string) {
+    try {
+      const res = await fetch('/api/sheets/ping', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deploymentUrl }),
+      });
+      return await res.json();
+    } catch (e) {
+      return { success: false, message: (e as Error).message };
+    }
+  },
+
+  // Sync single record to Google Sheet
+  async syncRecordToSheet(deploymentUrl: string, sheetName: string, record: Record<string, any>) {
+    if (!deploymentUrl) return null;
+    try {
+      const res = await fetch('/api/sheets/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deploymentUrl,
+          action: 'appendRecord',
+          sheetName,
+          record,
+        }),
+      });
+      return await res.json();
+    } catch (e) {
+      // Fallback: direct browser fetch
+      try {
+        const directRes = await fetch(deploymentUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'appendRecord',
+            sheetName,
+            record,
+          }),
+        });
+        return await directRes.json();
+      } catch (directErr) {
+        return { success: false, message: (directErr as Error).message };
+      }
+    }
+  },
+
+  // Bulk sync full application dataset to Google Sheet
+  async bulkSyncToSheet(deploymentUrl: string, payload: Record<string, any[]>, overwrite: boolean = false) {
+    if (!deploymentUrl) return { success: false, message: 'Apps Script Deployment URL missing' };
+    try {
+      const res = await fetch('/api/sheets/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deploymentUrl,
+          action: 'bulkSync',
+          payload,
+          overwrite,
+        }),
       });
       return await res.json();
     } catch (e) {

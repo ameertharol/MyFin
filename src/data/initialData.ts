@@ -17,6 +17,7 @@ import {
   Liability,
   Investment,
   NetWorthSnapshot,
+  SavingsContribution,
   Settings,
   AuditLog,
 } from '../types/finance';

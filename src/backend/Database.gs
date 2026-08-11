@@ -322,3 +322,15 @@ function appendSheetRow(sheetName, recordObj) {
   const row = headers.map(h => recordObj[h] !== undefined ? recordObj[h] : "");
   sheet.appendRow(row);
 }
+
+function clearSheetDataRows(sheetName) {
+  try {
+    const sheet = getSheet(sheetName);
+    const lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+      sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).clearContent();
+    }
+  } catch (err) {
+    Logger.log("clearSheetDataRows error: " + err);
+  }
+}

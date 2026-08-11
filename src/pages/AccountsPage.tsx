@@ -22,6 +22,7 @@ export const AccountsPage: React.FC = () => {
   };
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedStatementAccount, setSelectedStatementAccount] = useState<Account | null>(null);
 
   const handleOpenNewAccount = () => {
     setEditingAccount(null);

@@ -107,6 +107,15 @@ function doPost(e) {
     const action = postData.action || (e && e.parameter && e.parameter.action) || "sync";
     const sid = postData.spreadsheetId || (e && e.parameter && e.parameter.spreadsheetId) || undefined;
 
+    if (action === "ping" || action === "health") {
+      return responseJSON({
+        status: "success",
+        message: "Couple Finance Apps Script API is online and healthy.",
+        version: "2.4.0",
+        timestamp: new Date().toISOString()
+      });
+    }
+
     if (action === "autoUpdateSchema" || action === "initSheets") {
       const result = autoInitializeDatabase(sid);
       return responseJSON(result);
@@ -124,11 +133,15 @@ function doPost(e) {
 
     if (action === "bulkSync") {
       const payload = postData.payload || {};
+      const overwrite = postData.overwrite || false;
       let syncedCount = 0;
       for (const sheetName in payload) {
         if (SCHEMA[sheetName]) {
           const records = payload[sheetName];
           if (Array.isArray(records)) {
+            if (overwrite) {
+              clearSheetDataRows(sheetName);
+            }
             records.forEach(rec => appendSheetRow(sheetName, rec));
             syncedCount += records.length;
           }

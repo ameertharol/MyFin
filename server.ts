@@ -73,6 +73,85 @@ async function startServer() {
     });
   });
 
+  // Google Sheets DB Proxy Routes
+  app.post('/api/sheets/sync', async (req, res) => {
+    try {
+      const { deploymentUrl, action, sheetName, record, payload, overwrite } = req.body;
+      if (!deploymentUrl) {
+        return res.status(400).json({ success: false, message: 'Apps Script Deployment URL is required' });
+      }
+
+      const response = await fetch(deploymentUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: action || 'appendRecord',
+          sheetName,
+          record,
+          payload,
+          overwrite: overwrite || false,
+        }),
+      });
+
+      const text = await response.text();
+      let json: any = {};
+      try {
+        json = JSON.parse(text);
+      } catch {
+        json = { status: 'success', raw: text };
+      }
+
+      res.json({ success: true, message: 'Google Sheet sync completed', data: json });
+    } catch (err: any) {
+      console.error('Google Sheet Proxy Error:', err);
+      res.status(500).json({ success: false, message: err?.message || 'Failed to communicate with Google Sheet Web App' });
+    }
+  });
+
+  app.post('/api/sheets/ping', async (req, res) => {
+    try {
+      const { deploymentUrl } = req.body;
+      if (!deploymentUrl) {
+        return res.status(400).json({ success: false, message: 'Apps Script Deployment URL is required' });
+      }
+
+      const url = `${deploymentUrl}${deploymentUrl.includes('?') ? '&' : '?'}action=ping`;
+      const response = await fetch(url);
+      const text = await response.text();
+      let json: any = {};
+      try {
+        json = JSON.parse(text);
+      } catch {
+        json = { status: 'ok', raw: text };
+      }
+      res.json({ success: true, data: json });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err?.message || 'Connection test failed' });
+    }
+  });
+
+  app.post('/api/sheets/install', async (req, res) => {
+    try {
+      const { deploymentUrl, spreadsheetId } = req.body;
+      if (!deploymentUrl) {
+        return res.status(400).json({ success: false, message: 'Apps Script Deployment URL is required' });
+      }
+
+      const url = `${deploymentUrl}${deploymentUrl.includes('?') ? '&' : '?'}action=autoUpdateSchema${spreadsheetId ? `&spreadsheetId=${spreadsheetId}` : ''}`;
+      const response = await fetch(url);
+      const text = await response.text();
+      let json: any = {};
+      try {
+        json = JSON.parse(text);
+      } catch {
+        json = { status: 'completed', raw: text };
+      }
+      res.json({ success: true, data: json });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err?.message || 'Initialization trigger failed' });
+    }
+  });
+
   // Vite middleware for development vs Production static serving
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

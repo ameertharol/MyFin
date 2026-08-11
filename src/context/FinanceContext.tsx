@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
+import { apiService } from '../services/api';
 import { defaultFullPermissions, getCompletePermissions } from '../utils/permissionUtils';
 import {
   User,
@@ -181,6 +182,9 @@ interface FinanceContextType {
   finalizeRecurringTransaction: (recurringId: string, overrideAccountId?: string) => void;
   updateRecurringStatus: (recurringId: string, status: RecurringTransaction['Status']) => void;
   deleteRecurringTransaction: (recurringId: string) => void;
+
+  // Google Sheets Cloud Sync
+  syncAllToGoogleSheet: (overwrite?: boolean) => Promise<any>;
 
   // Financial Metrics
   filteredTransactions: Transaction[];
@@ -476,6 +480,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     setSettings((prev) => {
       const updated = { ...prev, ...newSettings };
       addAuditLog('Edit', 'Settings', prev.AppName, 'Updated application configuration');
+      syncToSheet('Settings', { SettingKey: 'AppSettings', SettingValue: JSON.stringify(updated), Description: 'Global application config', UpdatedDate: new Date().toISOString() });
       return updated;
     });
     addToast('success', 'Settings Saved', 'Application preferences have been updated.');
@@ -760,6 +765,57 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     };
   }, [filteredTransactions, users, settings.BaseCurrency]);
 
+  // Google Sheets Auto Sync Helper
+  const syncToSheet = (sheetName: string, record: Record<string, any>) => {
+    if (settings.AppsScriptDeploymentUrl && settings.AppsScriptDeploymentUrl.trim().startsWith('http')) {
+      apiService.syncRecordToSheet(settings.AppsScriptDeploymentUrl.trim(), sheetName, record)
+        .then((res) => {
+          if (res && res.success) {
+            console.log(`[Google Sheet Sync] Successfully appended record to ${sheetName}`);
+          } else {
+            console.warn(`[Google Sheet Sync] Notice appending to ${sheetName}:`, res?.message);
+          }
+        })
+        .catch((err) => {
+          console.error(`[Google Sheet Sync] Error syncing to ${sheetName}:`, err);
+        });
+    }
+  };
+
+  const syncAllToGoogleSheet = async (overwrite: boolean = false) => {
+    if (!settings.AppsScriptDeploymentUrl || !settings.AppsScriptDeploymentUrl.trim().startsWith('http')) {
+      addToast('error', 'Google Sheet URL Missing', 'Please enter your Google Apps Script Web App URL in Settings first.');
+      return { success: false, message: 'Google Apps Script Web App URL missing' };
+    }
+
+    const payload = {
+      Transactions: transactions,
+      Accounts: accounts,
+      Budgets: budgets,
+      Goals: goals,
+      Assets: assets,
+      Liabilities: liabilities,
+      Investments: investments,
+      Parties: parties,
+      Categories: categories,
+      Users: users,
+      Reminders: reminders,
+      RecurringTransactions: recurring,
+      AuditLogs: auditLogs,
+    };
+
+    addToast('info', 'Syncing to Google Sheet...', 'Sending all data tables to your Google Sheet...');
+    const res = await apiService.bulkSyncToSheet(settings.AppsScriptDeploymentUrl.trim(), payload, overwrite);
+
+    if (res && res.success) {
+      addToast('success', 'Google Sheet Synced!', 'All records have been successfully written to your Google Sheet!');
+      addAuditLog('Sync', 'Database', 'GoogleSheets', 'Pushed full application dataset to Google Sheets');
+    } else {
+      addToast('error', 'Sync Failed', res?.message || 'Could not send data to Google Sheets. Verify Web App URL access.');
+    }
+    return res;
+  };
+
   // Action Handlers
   const addTransaction = (txnData: Omit<Transaction, 'TransactionID' | 'CreatedDate' | 'CreatedBy' | 'Status'>) => {
     const txnId = 'TXN-' + Math.floor(100000 + Math.random() * 900000);
@@ -773,6 +829,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     };
 
     setTransactions((prev) => [newTxn, ...prev]);
+    syncToSheet('Transactions', newTxn);
     addAuditLog('Create', 'Transactions', txnId, `Created ${txnData.TransactionType} of ${txnData.Amount} ${txnData.Currency}`);
     addToast('success', 'Transaction Recorded', `${txnData.TransactionType} of ${formatMoney(txnData.Amount, txnData.Currency)} successfully logged.`);
 
@@ -789,6 +846,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     setTransactions((prev) =>
       prev.map((t) => (t.TransactionID === updatedTxn.TransactionID ? { ...updatedTxn, UpdatedBy: currentUser.UserID, UpdatedDate: new Date().toISOString().substring(0, 10) } : t))
     );
+    syncToSheet('Transactions', updatedTxn);
     addAuditLog('Edit', 'Transactions', updatedTxn.TransactionID, `Updated transaction ${updatedTxn.TransactionID}`);
     addToast('success', 'Transaction Saved', `Changes saved for transaction ${updatedTxn.TransactionID}.`);
   };
@@ -851,12 +909,14 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       UpdatedDate: new Date().toISOString().substring(0, 10),
     };
     setAccounts((prev) => [...prev, newAccount]);
+    syncToSheet('Accounts', newAccount);
     addAuditLog('Create', 'Accounts', accId, `Added new account ${accData.AccountName}`);
     addToast('success', 'Account Added', `Financial account ${accData.AccountName} created successfully.`);
   };
 
   const updateAccount = (updatedAcc: Account) => {
     setAccounts((prev) => prev.map((a) => (a.AccountID === updatedAcc.AccountID ? updatedAcc : a)));
+    syncToSheet('Accounts', updatedAcc);
     addAuditLog('Edit', 'Accounts', updatedAcc.AccountID, `Updated account details for ${updatedAcc.AccountName}`);
     addToast('success', 'Account Saved', `Account ${updatedAcc.AccountName} details updated.`);
   };
@@ -869,6 +929,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       ActualAmount: 0,
     };
     setBudgets((prev) => [...prev, newBudget]);
+    syncToSheet('Budgets', newBudget);
     addAuditLog('Create', 'Budgets', budId, `Created budget for category ${bData.CategoryID}`);
     addToast('success', 'Budget Planned', `Budget limit of ${formatMoney(bData.PlannedAmount, bData.Currency)} set.`);
   };
@@ -880,6 +941,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       GoalID: gId,
     };
     setGoals((prev) => [...prev, newGoal]);
+    syncToSheet('Goals', newGoal);
     addAuditLog('Create', 'Goals', gId, `Created savings goal: ${gData.GoalName}`);
     addToast('success', 'Goal Created', `Savings target ${gData.GoalName} established.`);
   };
@@ -980,6 +1042,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     const astId = 'AST-' + Math.floor(100000 + Math.random() * 900000);
     const newAsset: Asset = { ...astData, AssetID: astId };
     setAssets((prev) => [...prev, newAsset]);
+    syncToSheet('Assets', newAsset);
 
     if (fundingAccountId) {
       addTransaction({
@@ -1012,6 +1075,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     const lId = 'LIA-' + Math.floor(100000 + Math.random() * 900000);
     const newLiability: Liability = { ...lData, LiabilityID: lId };
     setLiabilities((prev) => [...prev, newLiability]);
+    syncToSheet('Liabilities', newLiability);
 
     if (receivingAccountId) {
       addTransaction({
@@ -1052,6 +1116,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     const invId = 'INV-' + Math.floor(100000 + Math.random() * 900000);
     const newInv: Investment = { ...invData, InvestmentID: invId };
     setInvestments((prev) => [...prev, newInv]);
+    syncToSheet('Investments', newInv);
     addAuditLog('Create', 'Investments', invId, `Added investment portfolio ${invData.InvestmentName}`);
     addToast('success', 'Investment Added', `Portfolio position in ${invData.InvestmentName} added.`);
   };
@@ -1060,6 +1125,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     const rId = 'REM-' + Math.floor(100000 + Math.random() * 900000);
     const newRem: Reminder = { ...remData, ReminderID: rId };
     setReminders((prev) => [...prev, newRem]);
+    syncToSheet('Reminders', newRem);
     addAuditLog('Create', 'Reminders', rId, `Created reminder: ${remData.Title}`);
     addToast('success', 'Reminder Set', `Alert scheduled for ${remData.Title}.`);
   };
@@ -1080,6 +1146,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     const recId = 'REC-' + Math.floor(100000 + Math.random() * 900000);
     const newRec: RecurringTransaction = { ...recData, RecurringID: recId };
     setRecurring((prev) => [...prev, newRec]);
+    syncToSheet('RecurringTransactions', newRec);
     const titleText = recData.Title || 'Recurring Item';
     addAuditLog('Create', 'Recurring', recId, `Created recurring rule: ${titleText}`);
     addToast('success', 'Recurring Created', `Recurring transaction "${titleText}" added.`);
@@ -1159,6 +1226,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       UpdatedDate: new Date().toISOString().substring(0, 10),
     };
     setUsers((prev) => [...prev, newUser]);
+    syncToSheet('Users', newUser);
     addAuditLog('Create', 'Users', userId, `Created user ${userData.FullName}`);
     addToast('success', 'User Added', `User profile for ${userData.FullName} created.`);
   };
@@ -1168,6 +1236,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     if (currentUser.UserID === updatedUser.UserID) {
       setCurrentUser(updatedUser);
     }
+    syncToSheet('Users', updatedUser);
     addAuditLog('Edit', 'Users', updatedUser.UserID, `Updated profile for ${updatedUser.FullName}`);
     addToast('success', 'Profile Updated', `User profile ${updatedUser.FullName} saved.`);
   };
@@ -1190,12 +1259,14 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       SubCategories: [],
     };
     setCategories((prev) => [...prev, newCategory]);
+    syncToSheet('Categories', newCategory);
     addAuditLog('Create', 'Categories', catId, `Added category ${catData.CategoryName}`);
     addToast('success', 'Category Created', `Category ${catData.CategoryName} added.`);
   };
 
   const updateCategory = (cat: Category) => {
     setCategories((prev) => prev.map((c) => (c.CategoryID === cat.CategoryID ? cat : c)));
+    syncToSheet('Categories', cat);
     addAuditLog('Edit', 'Categories', cat.CategoryID, `Updated category ${cat.CategoryName}`);
     addToast('success', 'Category Saved', `Category ${cat.CategoryName} updated.`);
   };
@@ -1352,6 +1423,8 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         finalizeRecurringTransaction,
         updateRecurringStatus,
         deleteRecurringTransaction,
+
+        syncAllToGoogleSheet,
 
         filteredTransactions,
         summaryMetrics,

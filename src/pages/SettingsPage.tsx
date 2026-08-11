@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useFinance } from '../context/FinanceContext';
+import { apiService } from '../services/api';
 import {
   Settings as SettingsIcon,
   Save,
@@ -56,6 +57,7 @@ export const SettingsPage: React.FC = () => {
     requestConfirmation,
     addToast,
     clearAllData,
+    syncAllToGoogleSheet,
   } = useFinance();
 
   const [appName, setAppName] = useState(settings.AppName);
@@ -77,6 +79,8 @@ export const SettingsPage: React.FC = () => {
   const [copiedScriptCode, setCopiedScriptCode] = useState(false);
   const [copiedClasp, setCopiedClasp] = useState(false);
   const [isInitializingSheets, setIsInitializingSheets] = useState(false);
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
+  const [isSyncingAll, setIsSyncingAll] = useState(false);
 
   const handleCopyClasp = () => {
     navigator.clipboard.writeText(`npm install -g @google/clasp\nclasp login\nclasp clone "${spreadsheetId || 'YOUR_SPREADSHEET_OR_SCRIPT_ID'}"`);
@@ -315,18 +319,49 @@ function responseJSON(obj) {
     }
     setIsInitializingSheets(true);
     try {
-      const url = `${deploymentUrl}?action=autoUpdateSchema&spreadsheetId=${encodeURIComponent(spreadsheetId)}`;
-      const response = await fetch(url, { mode: 'cors', redirect: 'follow' });
-      const data = await response.json();
-      if (data.status === 'success') {
-        addToast('success', 'Sheets Auto-Created!', data.message || 'All 27 sheet tabs and headers created automatically.');
+      const res = await apiService.triggerGoogleSheetInstall(deploymentUrl.trim(), spreadsheetId.trim());
+      if (res && res.success) {
+        addToast('success', 'Sheets Auto-Created!', res.data?.message || 'All 27 sheet tabs and headers created automatically.');
       } else {
-        addToast('info', 'Web App Triggered', 'Request sent to Google Apps Script.');
+        addToast('warning', 'Initialization Notice', res?.message || 'Check your Apps Script Web App permissions.');
       }
-    } catch (err) {
-      addToast('info', 'Sync Triggered', 'Web App requested. You can also click "⚡ Couple Finance" menu directly in Google Sheets!');
+    } catch (err: any) {
+      addToast('error', 'Request Failed', err?.message || 'Could not trigger sheet auto-creation.');
     } finally {
       setIsInitializingSheets(false);
+    }
+  };
+
+  const handleTestConnection = async () => {
+    if (!deploymentUrl) {
+      addToast('warning', 'Missing Web App URL', 'Please paste your Google Apps Script Web App Deployment URL first.');
+      return;
+    }
+    setIsTestingConnection(true);
+    try {
+      const res = await apiService.pingGoogleSheet(deploymentUrl.trim());
+      if (res && res.success && res.data?.status === 'success') {
+        addToast('success', 'Connection Verified!', `Google Sheets API connected! (${res.data?.message || 'Online'})`);
+      } else {
+        addToast('error', 'Connection Error', res?.message || 'Web App did not respond. Check "Who has access: Anyone".');
+      }
+    } catch (err: any) {
+      addToast('error', 'Connection Failed', err?.message || 'Network error connecting to Web App.');
+    } finally {
+      setIsTestingConnection(false);
+    }
+  };
+
+  const handleSyncAllData = async (overwrite: boolean = false) => {
+    if (!deploymentUrl) {
+      addToast('warning', 'Missing Web App URL', 'Please paste your Google Apps Script Web App Deployment URL first.');
+      return;
+    }
+    setIsSyncingAll(true);
+    try {
+      await syncAllToGoogleSheet(overwrite);
+    } finally {
+      setIsSyncingAll(false);
     }
   };
 
@@ -1312,21 +1347,41 @@ function responseJSON(obj) {
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <button
                 type="button"
+                onClick={handleTestConnection}
+                disabled={isTestingConnection}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl font-bold text-xs shadow-sm transition-colors"
+              >
+                {isTestingConnection ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+                <span>🔌 Test Connection</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSyncAllData(false)}
+                disabled={isSyncingAll}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl font-bold text-xs shadow-sm transition-colors"
+              >
+                {isSyncingAll ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FileSpreadsheet className="w-4 h-4" />}
+                <span>📤 Sync All Data to Google Sheet</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={handleAutoInitializeSheets}
                 disabled={isInitializingSheets}
-                className="flex items-center gap-1.5 px-3.5 py-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white rounded-xl font-bold text-xs shadow-sm"
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white rounded-xl font-bold text-xs shadow-sm transition-colors"
               >
                 {isInitializingSheets ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
-                <span>⚡ Auto-Create / Update All Sheets & Headers</span>
+                <span>⚡ Auto-Create All 27 Sheets & Headers</span>
               </button>
 
               <button
                 type="button"
                 onClick={handleCopyScriptCode}
-                className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold text-xs shadow-sm"
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold text-xs shadow-sm transition-colors"
               >
                 {copiedScriptCode ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-                <span>{copiedScriptCode ? 'Script Copied!' : '📋 Copy Apps Script Source Code'}</span>
+                <span>{copiedScriptCode ? 'Script Copied!' : '📋 Copy Apps Script Code'}</span>
               </button>
             </div>
           </div>
