@@ -243,10 +243,13 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   });
 
   useEffect(() => {
+    const root = document.documentElement;
     if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
+      root.classList.add('dark');
+      root.style.colorScheme = 'dark';
     } else {
-      document.documentElement.classList.remove('dark');
+      root.classList.remove('dark');
+      root.style.colorScheme = 'light';
     }
     localStorage.setItem('theme', theme);
   }, [theme]);
@@ -467,6 +470,9 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   const updateSettings = (newSettings: Partial<Settings>) => {
+    if (newSettings.Theme && (newSettings.Theme === 'dark' || newSettings.Theme === 'light')) {
+      setTheme(newSettings.Theme);
+    }
     setSettings((prev) => {
       const updated = { ...prev, ...newSettings };
       addAuditLog('Edit', 'Settings', prev.AppName, 'Updated application configuration');

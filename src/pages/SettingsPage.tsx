@@ -460,59 +460,59 @@ function responseJSON(obj) {
       </div>
 
       {/* Navigation Tabs */}
-      <div className="flex flex-wrap gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-semibold max-w-5xl">
+      <div className="flex items-center gap-1.5 p-1.5 bg-slate-100 dark:bg-slate-800/80 rounded-2xl text-xs font-semibold overflow-x-auto no-scrollbar scroll-smooth whitespace-nowrap max-w-full">
         <button
           onClick={() => setActiveTab('general')}
-          className={`px-3 py-2 rounded-lg transition-all ${
-            activeTab === 'general' ? 'bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-xs font-bold' : 'text-slate-500'
+          className={`shrink-0 px-3 py-2 rounded-xl transition-all ${
+            activeTab === 'general' ? 'bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-xs font-bold' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
           }`}
         >
           General & Branding
         </button>
         <button
           onClick={() => setActiveTab('users')}
-          className={`px-3 py-2 rounded-lg transition-all ${
-            activeTab === 'users' ? 'bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-xs font-bold' : 'text-slate-500'
+          className={`shrink-0 px-3 py-2 rounded-xl transition-all ${
+            activeTab === 'users' ? 'bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-xs font-bold' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
           }`}
         >
           Users & Profiles ({users.length})
         </button>
         <button
           onClick={() => setActiveTab('roles')}
-          className={`px-3 py-2 rounded-lg transition-all ${
-            activeTab === 'roles' ? 'bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-xs font-bold' : 'text-slate-500'
+          className={`shrink-0 px-3 py-2 rounded-xl transition-all ${
+            activeTab === 'roles' ? 'bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-xs font-bold' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
           }`}
         >
           Role Groups RBAC ({roleGroups.length})
         </button>
         <button
           onClick={() => setActiveTab('categories')}
-          className={`px-3 py-2 rounded-lg transition-all ${
-            activeTab === 'categories' ? 'bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-xs font-bold' : 'text-slate-500'
+          className={`shrink-0 px-3 py-2 rounded-xl transition-all ${
+            activeTab === 'categories' ? 'bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-xs font-bold' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
           }`}
         >
           Categories ({categories.length})
         </button>
         <button
           onClick={() => setActiveTab('currencies')}
-          className={`px-3 py-2 rounded-lg transition-all ${
-            activeTab === 'currencies' ? 'bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-xs font-bold' : 'text-slate-500'
+          className={`shrink-0 px-3 py-2 rounded-xl transition-all ${
+            activeTab === 'currencies' ? 'bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-xs font-bold' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
           }`}
         >
           Multi-Currency ({currencies.length})
         </button>
         <button
           onClick={() => setActiveTab('database')}
-          className={`px-3 py-2 rounded-lg transition-all ${
-            activeTab === 'database' ? 'bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-xs font-bold' : 'text-slate-500'
+          className={`shrink-0 px-3 py-2 rounded-xl transition-all ${
+            activeTab === 'database' ? 'bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-xs font-bold' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
           }`}
         >
           Google Sheets DB
         </button>
         <button
           onClick={() => setActiveTab('audit')}
-          className={`px-3 py-2 rounded-lg transition-all ${
-            activeTab === 'audit' ? 'bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-xs font-bold' : 'text-slate-500'
+          className={`shrink-0 px-3 py-2 rounded-xl transition-all ${
+            activeTab === 'audit' ? 'bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-xs font-bold' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
           }`}
         >
           Audit Logs
