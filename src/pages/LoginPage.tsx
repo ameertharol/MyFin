@@ -44,38 +44,6 @@ export const LoginPage: React.FC = () => {
           <p className="text-xs text-slate-400 mt-1 font-medium">Wealth Governance & Private Finance Portal</p>
         </div>
 
-        {/* Demo Credentials Quick Selector */}
-        <div className="mb-6 p-3.5 bg-slate-800/60 border border-slate-700/60 rounded-xl text-xs">
-          <div className="flex items-center gap-1.5 font-semibold text-teal-400 mb-2">
-            <KeyRound className="w-3.5 h-3.5" />
-            <span>Demo Access Accounts</span>
-          </div>
-          <div className="space-y-2">
-            {users.map((u) => (
-              <div
-                key={u.UserID}
-                onClick={() => handleQuickFill(u.Username, u.Password || 'admin123')}
-                className="flex items-center justify-between p-2 rounded-lg bg-slate-900/80 hover:bg-teal-950/40 border border-slate-800 hover:border-teal-700/50 cursor-pointer transition-all group"
-              >
-                <div>
-                  <div className="font-semibold text-slate-200 group-hover:text-teal-300">
-                    {u.FullName} <span className="text-[10px] text-slate-400">({u.Username})</span>
-                  </div>
-                  <div className="text-[10px] text-slate-400 font-mono">
-                    Pass: <span className="text-slate-300">{u.Password || 'admin123'}</span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="text-[11px] font-medium px-2 py-1 rounded bg-teal-600/20 text-teal-300 group-hover:bg-teal-600 group-hover:text-white transition-all"
-                >
-                  Fill
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-
         {/* Error Alert */}
         {errorMsg && (
           <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs rounded-xl text-center font-medium">
@@ -94,7 +62,7 @@ export const LoginPage: React.FC = () => {
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter username e.g. alex"
+                placeholder="Enter username (e.g. admin)"
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-950/80 border border-slate-800 focus:border-teal-500 rounded-xl text-sm text-white placeholder-slate-500 outline-none transition-all"
               />
             </div>
@@ -109,7 +77,7 @@ export const LoginPage: React.FC = () => {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter password e.g. admin123"
+                placeholder="Enter password"
                 className="w-full pl-10 pr-10 py-2.5 bg-slate-950/80 border border-slate-800 focus:border-teal-500 rounded-xl text-sm text-white placeholder-slate-500 outline-none transition-all"
               />
               <button

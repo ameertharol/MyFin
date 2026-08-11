@@ -27,6 +27,10 @@ import {
   RefreshCw,
   FileSpreadsheet,
   Zap,
+  Github,
+  Code,
+  Terminal,
+  Smartphone,
 } from 'lucide-react';
 import { UserEditModal } from '../components/modals/UserEditModal';
 import { CategoryEditModal } from '../components/modals/CategoryEditModal';
@@ -51,6 +55,7 @@ export const SettingsPage: React.FC = () => {
     toggleTheme,
     requestConfirmation,
     addToast,
+    clearAllData,
   } = useFinance();
 
   const [appName, setAppName] = useState(settings.AppName);
@@ -70,7 +75,15 @@ export const SettingsPage: React.FC = () => {
   const [spreadsheetId, setSpreadsheetId] = useState(settings.SpreadsheetId || '');
   const [deploymentUrl, setDeploymentUrl] = useState(settings.AppsScriptDeploymentUrl || '');
   const [copiedScriptCode, setCopiedScriptCode] = useState(false);
+  const [copiedClasp, setCopiedClasp] = useState(false);
   const [isInitializingSheets, setIsInitializingSheets] = useState(false);
+
+  const handleCopyClasp = () => {
+    navigator.clipboard.writeText(`npm install -g @google/clasp\nclasp login\nclasp clone "${spreadsheetId || 'YOUR_SPREADSHEET_OR_SCRIPT_ID'}"`);
+    setCopiedClasp(true);
+    addToast('success', 'clasp Commands Copied', 'Paste in terminal to sync Google Apps Script with GitHub.');
+    setTimeout(() => setCopiedClasp(false), 3000);
+  };
 
   const handleSheetUrlChange = (val: string) => {
     setSheetUrl(val);
@@ -207,12 +220,68 @@ function formatHeaders(sheet, cols) {
 }
 
 function doGet(e) {
-  const action = e && e.parameter && e.parameter.action ? e.parameter.action : "ping";
+  const action = e && e.parameter && e.parameter.action ? e.parameter.action : null;
   const sid = e && e.parameter ? e.parameter.spreadsheetId : undefined;
+  
   if (action === "autoUpdateSchema" || action === "initSheets") {
     return responseJSON(autoInitializeDatabase(sid));
   }
-  return responseJSON({ status: "success", message: "Couple Finance Apps Script Active" });
+  
+  if (action || (e && e.parameter && e.parameter.format === 'json')) {
+    return responseJSON({ status: "success", message: "Couple Finance Apps Script Active", timestamp: new Date().toISOString() });
+  }
+
+  const htmlContent = '<!DOCTYPE html>' +
+'<html>' +
+'  <head>' +
+'    <base target="_top">' +
+'    <meta name="viewport" content="width=device-width, initial-scale=1.0">' +
+'    <title>Couple Finance - Apps Script DB Engine</title>' +
+'    <style>' +
+'      body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 24px; display: flex; justify-content: center; align-items: center; min-height: 100vh; box-sizing: border-box; }' +
+'      .card { background: #1e293b; border: 1px solid #334155; border-radius: 20px; padding: 32px; max-width: 520px; width: 100%; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); text-align: center; }' +
+'      .badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(13,148,136,0.15); color: #2dd4bf; border: 1px solid #0d9488; padding: 6px 14px; border-radius: 9999px; font-size: 12px; font-weight: 700; text-transform: uppercase; margin-bottom: 16px; }' +
+'      h1 { margin: 0 0 8px 0; font-size: 24px; font-weight: 800; color: #ffffff; }' +
+'      p { color: #94a3b8; font-size: 13px; line-height: 1.6; margin: 0 0 24px 0; }' +
+'      .status-box { background: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 16px; text-align: left; margin-bottom: 24px; font-size: 13px; }' +
+'      .status-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #1e293b; }' +
+'      .status-row:last-child { border-bottom: none; }' +
+'      .status-label { color: #94a3b8; }' +
+'      .status-val { color: #34d399; font-weight: 700; }' +
+'      .btn { display: block; width: 100%; padding: 14px 20px; background: #0d9488; color: #ffffff; font-weight: 700; font-size: 14px; text-decoration: none; border-radius: 12px; margin-bottom: 10px; box-sizing: border-box; border: none; cursor: pointer; }' +
+'      .footer { font-size: 11px; color: #64748b; margin-top: 18px; line-height: 1.5; }' +
+'    </style>' +
+'  </head>' +
+'  <body>' +
+'    <div class="card">' +
+'      <div class="badge">⚡ Database Engine Active</div>' +
+'      <h1>Couple Finance Apps Script</h1>' +
+'      <p>Your Google Sheets Database Web App is running! It receives live transaction & budget syncs from your main Couple Finance Web Application.</p>' +
+'      <div class="status-box">' +
+'        <div class="status-row"><span class="status-label">Database Status:</span><span class="status-val">● Connected & Online</span></div>' +
+'        <div class="status-row"><span class="status-label">Active Schema:</span><span class="status-val">27 Sheet Tables Ready</span></div>' +
+'        <div class="status-row"><span class="status-label">Web App Security:</span><span class="status-val">Execute as Me / Anyone</span></div>' +
+'      </div>' +
+'      <button onclick="runSetupInBrowser()" class="btn">⚡ Auto-Create / Refresh 27 Sheet Tabs</button>' +
+'      <div class="footer">' +
+'        Paste this Web App URL into <strong>Settings &gt; Google Sheets DB &gt; Apps Script Web App URL</strong> inside your Couple Finance app to enable real-time cloud spreadsheet syncing.' +
+'      </div>' +
+'    </div>' +
+'    <script>' +
+'      function runSetupInBrowser() {' +
+'        var url = window.location.href + (window.location.href.indexOf("?") > -1 ? "&" : "?") + "action=autoUpdateSchema";' +
+'        fetch(url)' +
+'          .then(function(res) { return res.json(); })' +
+'          .then(function(data) { alert("Success! " + (data.message || "All 27 sheets updated.")); })' +
+'          .catch(function(err) { alert("Sync triggered! Check your Google Sheet tabs."); });' +
+'      }' +
+'    </script>' +
+'  </body>' +
+'</html>';
+
+  return HtmlService.createHtmlOutput(htmlContent)
+    .setTitle("Couple Finance DB Engine")
+    .setXframeOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 function doPost(e) {
@@ -1282,14 +1351,168 @@ function responseJSON(obj) {
             </ol>
           </div>
 
-          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
-            <button
-              type="button"
-              onClick={handleExportBackup}
-              className="flex items-center gap-1.5 px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 font-bold rounded-xl text-xs"
-            >
-              <Download className="w-4 h-4" /> Download Local JSON Backup
-            </button>
+          {/* GitHub & Google Apps Script Connection Box */}
+          <div className="p-4 bg-slate-900 text-slate-100 rounded-xl border border-slate-800 space-y-3 text-xs">
+            <div className="flex items-center justify-between">
+              <h4 className="font-bold text-white text-sm flex items-center gap-2">
+                <Github className="w-4 h-4 text-teal-400" /> Connecting GitHub & Google Apps Script
+              </h4>
+              <span className="px-2 py-0.5 rounded bg-teal-950 text-teal-400 text-[10px] font-mono border border-teal-800">
+                /src/backend/Code.gs & Database.gs
+              </span>
+            </div>
+
+            <p className="text-slate-300 text-[11px] leading-relaxed">
+              To keep your GitHub repository, Google Apps Script code, and this web app completely connected:
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px]">
+              <div className="p-3 bg-slate-800/80 rounded-lg border border-slate-700/80 space-y-1.5">
+                <div className="font-bold text-teal-300 flex items-center gap-1.5">
+                  <Code className="w-3.5 h-3.5 text-teal-400" /> Desktop / Chrome Browser
+                </div>
+                <p className="text-slate-300 leading-normal">
+                  Install the free <strong>Google Apps Script GitHub Extension</strong> from Chrome Web Store. It adds a "GitHub" button directly inside your Apps Script editor to pull/push code automatically!
+                </p>
+                <a
+                  href="https://chromewebstore.google.com/detail/google-apps-script-github/pfhoipkmlgkkedhhleidbgaijcidjpdm"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-[10px] font-bold text-teal-400 hover:underline pt-1"
+                >
+                  <ExternalLink className="w-3 h-3" /> Get Chrome Extension
+                </a>
+              </div>
+
+              <div className="p-3 bg-slate-800/80 rounded-lg border border-slate-700/80 space-y-1.5">
+                <div className="font-bold text-amber-300 flex items-center gap-1.5">
+                  <Terminal className="w-3.5 h-3.5 text-amber-400" /> CLI Terminal (Google clasp)
+                </div>
+                <p className="text-slate-300 leading-normal">
+                  Use Google's official command line tool <code>@google/clasp</code> to pull or push code directly between your local Git repo and Google Apps Script.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleCopyClasp}
+                  className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 bg-slate-700 hover:bg-slate-600 text-amber-300 rounded border border-slate-600 transition-colors mt-1"
+                >
+                  {copiedClasp ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                  <span>{copiedClasp ? 'Copied!' : '📋 Copy clasp Terminal Commands'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Mobile-Specific Section */}
+            <div className="p-3 bg-teal-950/60 rounded-lg border border-teal-800/70 space-y-2 text-[11px]">
+              <div className="font-bold text-teal-300 flex items-center gap-1.5 text-xs">
+                <Smartphone className="w-4 h-4 text-teal-400" /> How to Connect on Mobile Devices (Android & iOS):
+              </div>
+              <ul className="list-disc list-inside space-y-1 text-slate-200 text-[11px] leading-relaxed">
+                <li>
+                  <strong>Android Users (Kiwi Browser):</strong> Install <em>Kiwi Browser</em> (free on Play Store), which supports Chrome extensions on mobile. Open <code>script.google.com</code> in Kiwi Browser, install the Chrome Extension, and connect GitHub directly on your phone!
+                </li>
+                <li>
+                  <strong>iOS / iPhone Users (Working Copy App):</strong> Download <em>Working Copy</em> (Git client for iOS). You can clone your GitHub repository and edit code on your iPhone or iPad.
+                </li>
+                <li>
+                  <strong>Quick 1-Tap Mobile Copy:</strong> Tap <strong>📋 Copy Apps Script Source Code</strong> at the top of this page, open <code>script.google.com</code> in your mobile browser, and paste it directly into the editor!
+                </li>
+              </ul>
+            </div>
+
+            <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
+              <span className="flex items-center gap-1 text-slate-300">
+                <Zap className="w-3.5 h-3.5 text-amber-400" /> Repo path for Apps Script source:
+              </span>
+              <code className="bg-slate-950 px-2 py-0.5 rounded text-teal-300 font-mono text-[10px]">
+                /src/backend/Code.gs
+              </code>
+            </div>
+          </div>
+
+          {/* Vercel & GitHub Web App Deployment Box */}
+          <div className="p-4 bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950 text-slate-100 rounded-xl border border-indigo-900/60 space-y-3 text-xs shadow-md">
+            <div className="flex items-center justify-between">
+              <h4 className="font-bold text-white text-sm flex items-center gap-2">
+                <Globe className="w-4 h-4 text-indigo-400" /> Deploy UI: Connect GitHub Repository to Vercel
+              </h4>
+              <span className="px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 text-[10px] font-mono border border-indigo-800">
+                Automatic CI/CD Production
+              </span>
+            </div>
+
+            <p className="text-slate-300 text-[11px] leading-relaxed">
+              When you connect your GitHub repository to Vercel, every time you push code to GitHub, Vercel automatically builds and deploys your application instantly!
+            </p>
+
+            <ol className="list-decimal list-inside space-y-2 text-[11px] text-slate-200 leading-relaxed bg-slate-950/70 p-3 rounded-lg border border-slate-800">
+              <li>
+                <strong>Push Code to GitHub:</strong> Ensure your application code (including the newly generated <code>vercel.json</code>) is pushed to your GitHub repository.
+              </li>
+              <li>
+                <strong>Sign In / Register on Vercel:</strong> Go to <a href="https://vercel.com/signup" target="_blank" rel="noreferrer" className="text-indigo-400 font-bold hover:underline">vercel.com</a> and sign in with your <strong>GitHub account</strong>.
+              </li>
+              <li>
+                <strong>Add New Project:</strong> Click <strong>"Add New..." &gt; "Project"</strong> on your Vercel Dashboard.
+              </li>
+              <li>
+                <strong>Import GitHub Repo:</strong> Select your <strong>Couple Finance GitHub repository</strong> from the list and click <strong>Import</strong>.
+              </li>
+              <li>
+                <strong>Build Settings (Auto-Detected):</strong> Vercel automatically detects Vite:
+                <ul className="list-disc list-inside ml-4 mt-1 space-y-0.5 text-slate-400 font-mono text-[10px]">
+                  <li>Framework Preset: <span className="text-emerald-400">Vite</span></li>
+                  <li>Build Command: <span className="text-emerald-400">vite build</span> (or npm run build)</li>
+                  <li>Output Directory: <span className="text-emerald-400">dist</span></li>
+                </ul>
+              </li>
+              <li>
+                <strong>Click Deploy:</strong> Click <strong>Deploy</strong>! Within 1 minute, Vercel will give you a live production web URL (e.g. <code>https://your-app.vercel.app</code>).
+              </li>
+            </ol>
+
+            <div className="flex items-center justify-between pt-1">
+              <a
+                href="https://vercel.com/new"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold text-xs shadow transition-colors"
+              >
+                <ExternalLink className="w-3.5 h-3.5" /> Open Vercel Project Setup
+              </a>
+              <span className="text-[10px] text-slate-400">
+                ✅ Includes <code>vercel.json</code> for seamless SPA routing
+              </span>
+            </div>
+          </div>
+
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap justify-between items-center gap-2">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleExportBackup}
+                className="flex items-center gap-1.5 px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 font-bold rounded-xl text-xs"
+              >
+                <Download className="w-4 h-4" /> Download Local JSON Backup
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  requestConfirmation({
+                    title: 'Clear All Demo Data & Reset Database',
+                    message: 'Are you sure you want to permanently remove all transactions, accounts, budgets, goals, assets, liabilities, and demo data? This action cannot be undone.',
+                    actionType: 'Delete',
+                    confirmText: 'Yes, Clear All Data',
+                    onConfirm: () => {
+                      clearAllData();
+                    },
+                  });
+                }}
+                className="flex items-center gap-1.5 px-4 py-2 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 text-rose-700 dark:text-rose-300 font-bold rounded-xl text-xs border border-rose-200 dark:border-rose-900 transition-colors"
+              >
+                <Trash2 className="w-4 h-4" /> Clear All Data & Reset
+              </button>
+            </div>
             <button
               type="button"
               onClick={handleSaveGeneral}

@@ -210,6 +210,7 @@ interface FinanceContextType {
   formatDate: (dateStr: string) => string;
   formatMoney: (amount: number, currencyCode?: string) => string;
   convertCurrency: (amount: number, fromCurrency: string, toCurrency?: string) => number;
+  clearAllData: () => void;
 }
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
@@ -500,6 +501,30 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     // Amount in base (AED) = amount * rateFrom
     const inBase = amount * rateFrom;
     return inBase / rateTo;
+  };
+
+  const clearAllData = () => {
+    setAccounts([]);
+    setTransactions([]);
+    setParties([]);
+    setBudgets([]);
+    setGoals([]);
+    setAssets([]);
+    setLiabilities([]);
+    setInvestments([]);
+    setRecurring([]);
+    setReminders([]);
+    setNotifications([]);
+    setNetWorthSnapshots([]);
+    setSavingsContributions([]);
+    setAuditLogs([]);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.clear();
+        localStorage.setItem('auth_session', 'true');
+      } catch (e) {}
+    }
+    addToast('success', 'Database Cleared', 'All demo and transactional data have been permanently removed.');
   };
 
   const formatDate = (dateStr: string): string => {
@@ -1328,6 +1353,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         formatDate,
         formatMoney,
         convertCurrency,
+        clearAllData,
       }}
     >
       {children}
