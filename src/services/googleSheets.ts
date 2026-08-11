@@ -147,6 +147,45 @@ export class GoogleSheetsService {
     return await res.json();
   }
 
+  private verifiedTabs = new Set<string>();
+
+  async ensureTabWithHeaders(accessToken: string, sheetName: string) {
+    if (this.verifiedTabs.has(sheetName)) return;
+
+    try {
+      const meta = await this.getSpreadsheetMetadata(accessToken);
+      const existingTitles: string[] = (meta.sheets || []).map(
+        (s: any) => s.properties?.title
+      );
+
+      if (!existingTitles.includes(sheetName)) {
+        // Create tab
+        await fetch(
+          `https://sheets.googleapis.com/v4/spreadsheets/${this.spreadsheetId}:batchUpdate`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              requests: [{ addSheet: { properties: { title: sheetName } } }],
+            }),
+          }
+        );
+
+        // Add headers
+        const headers = SHEET_SCHEMAS[sheetName];
+        if (headers) {
+          await this.overwriteSheet(accessToken, sheetName, [headers]);
+        }
+      }
+      this.verifiedTabs.add(sheetName);
+    } catch (e) {
+      console.warn(`[ensureTabWithHeaders notice for ${sheetName}]:`, e);
+    }
+  }
+
   async ensureTabsExist(accessToken: string): Promise<string[]> {
     const meta = await this.getSpreadsheetMetadata(accessToken);
     const existingTitles: string[] = (meta.sheets || []).map(
@@ -178,6 +217,9 @@ export class GoogleSheetsService {
       }
     }
 
+    missingTabs.forEach((t) => this.verifiedTabs.add(t));
+    existingTitles.forEach((t) => this.verifiedTabs.add(t));
+
     return [...existingTitles, ...missingTabs];
   }
 
@@ -204,6 +246,7 @@ export class GoogleSheetsService {
   }
 
   async appendRecord(accessToken: string, sheetName: string, record: Record<string, any>) {
+    await this.ensureTabWithHeaders(accessToken, sheetName);
     const headers = SHEET_SCHEMAS[sheetName] || Object.keys(record);
     const row = recordToRow(headers, record);
     const range = `${sheetName}!A1`;
