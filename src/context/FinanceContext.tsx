@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
 import { apiService } from '../services/api';
+import { initAuth, googleSignIn, logout as googleLogout, getAccessToken } from '../services/auth';
+import { googleSheetsService } from '../services/googleSheets';
 import { defaultFullPermissions, getCompletePermissions } from '../utils/permissionUtils';
 import {
   User,
@@ -183,8 +185,12 @@ interface FinanceContextType {
   updateRecurringStatus: (recurringId: string, status: RecurringTransaction['Status']) => void;
   deleteRecurringTransaction: (recurringId: string) => void;
 
-  // Google Sheets Cloud Sync
+  // Google Sheets Cloud Sync & OAuth
   syncAllToGoogleSheet: (overwrite?: boolean) => Promise<any>;
+  isGoogleSignedIn: boolean;
+  googleUser: any;
+  handleGoogleSignIn: () => Promise<void>;
+  handleGoogleLogout: () => Promise<void>;
 
   // Financial Metrics
   filteredTransactions: Transaction[];
@@ -765,54 +771,120 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     };
   }, [filteredTransactions, users, settings.BaseCurrency]);
 
+  // Google Sheets & OAuth State
+  const [googleUser, setGoogleUser] = useState<any>(null);
+  const [isGoogleSignedIn, setIsGoogleSignedIn] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = initAuth(
+      (user, token) => {
+        setGoogleUser(user);
+        setIsGoogleSignedIn(true);
+        // Automatically perform full database sync when authenticated
+        googleSheetsService
+          .syncFullDatabase(token, {
+            transactions,
+            accounts,
+            budgets,
+            savingsGoals: goals,
+            savingsContributions,
+            assets,
+            liabilities,
+            investments,
+            reminders,
+            recurringTransactions: recurring,
+            categories,
+            users,
+            settings,
+          })
+          .then(() => console.log('[Google Sheets Direct Sync] Initial auto-sync complete.'))
+          .catch((err) => console.warn('[Google Sheets Sync Note]:', err));
+      },
+      () => {
+        setGoogleUser(null);
+        setIsGoogleSignedIn(false);
+      }
+    );
+    return () => unsubscribe();
+  }, []);
+
+  const handleGoogleSignIn = async () => {
+    try {
+      const res = await googleSignIn();
+      if (res?.accessToken) {
+        setGoogleUser(res.user);
+        setIsGoogleSignedIn(true);
+        addToast('success', 'Google Account Connected!', 'Google Sheets live sync is now active.');
+        await syncAllToGoogleSheet(false);
+      }
+    } catch (err: any) {
+      addToast('error', 'Google Sign-In Failed', err?.message || 'Could not connect Google Account.');
+    }
+  };
+
+  const handleGoogleLogout = async () => {
+    await googleLogout();
+    setGoogleUser(null);
+    setIsGoogleSignedIn(false);
+    addToast('info', 'Google Account Disconnected', 'Google Sheets direct sync paused.');
+  };
+
   // Google Sheets Auto Sync Helper
-  const syncToSheet = (sheetName: string, record: Record<string, any>) => {
-    const deployUrl = settings.AppsScriptDeploymentUrl?.trim() || '';
-    apiService.syncRecordToSheet(deployUrl, sheetName, record)
-      .then((res) => {
-        if (res && res.success) {
-          console.log(`[Google Sheet Sync] Successfully synced record to ${sheetName}`);
-        } else {
-          console.warn(`[Google Sheet Sync] Notice syncing to ${sheetName}:`, res?.message);
-        }
-      })
-      .catch((err) => {
-        console.error(`[Google Sheet Sync] Error syncing to ${sheetName}:`, err);
-      });
+  const syncToSheet = async (sheetName: string, record: Record<string, any>) => {
+    try {
+      const token = getAccessToken();
+      if (token) {
+        await googleSheetsService.appendRecord(token, sheetName, record);
+        console.log(`[Google Sheets REST API] Synced record to sheet "${sheetName}"`);
+      } else {
+        await apiService.syncRecordToSheet('', sheetName, record);
+      }
+    } catch (err) {
+      console.warn(`[Google Sheets Auto Sync Notice on ${sheetName}]:`, err);
+    }
   };
 
   const syncAllToGoogleSheet = async (overwrite: boolean = false) => {
-    if (!settings.AppsScriptDeploymentUrl || !settings.AppsScriptDeploymentUrl.trim().startsWith('http')) {
-      addToast('error', 'Google Sheet URL Missing', 'Please enter your Google Apps Script Web App URL in Settings first.');
-      return { success: false, message: 'Google Apps Script Web App URL missing' };
+    let token = getAccessToken();
+    if (!token) {
+      try {
+        const res = await googleSignIn();
+        token = res?.accessToken || null;
+      } catch (err: any) {
+        addToast('warning', 'Google Sign-In Needed', 'Please connect your Google account to sync directly to Google Sheets.');
+        return { success: false, message: 'Auth required' };
+      }
     }
+
+    if (!token) return { success: false, message: 'Google Token required' };
 
     const payload = {
-      Transactions: transactions,
-      Accounts: accounts,
-      Budgets: budgets,
-      Goals: goals,
-      Assets: assets,
-      Liabilities: liabilities,
-      Investments: investments,
-      Parties: parties,
-      Categories: categories,
-      Users: users,
-      Reminders: reminders,
-      RecurringTransactions: recurring,
-      AuditLogs: auditLogs,
+      transactions,
+      accounts,
+      budgets,
+      savingsGoals: goals,
+      savingsContributions,
+      assets,
+      liabilities,
+      investments,
+      reminders,
+      recurringTransactions: recurring,
+      categories,
+      users,
+      settings,
     };
 
-    addToast('info', 'Syncing to Google Sheet...', 'Sending all data tables to your Google Sheet...');
-    const res = await apiService.bulkSyncToSheet(settings.AppsScriptDeploymentUrl.trim(), payload, overwrite);
+    addToast('info', 'Syncing Google Sheet...', 'Writing all database records to Google Sheet 13Ceb4ut03DWZ3GUJmMh2uduklLCc1qnn7faRjXV2pac...');
 
-    if (res && res.success) {
-      addToast('success', 'Google Sheet Synced!', 'All records have been successfully written to your Google Sheet!');
-      addAuditLog('Sync', 'Database', 'GoogleSheets', 'Pushed full application dataset to Google Sheets');
-    } else {
-      addToast('error', 'Sync Failed', res?.message || 'Could not send data to Google Sheets. Verify Web App URL access.');
+    try {
+      const results = await googleSheetsService.syncFullDatabase(token, payload);
+      addToast('success', 'Google Sheet Synced!', 'All 13 tables are now fully updated in your Google Sheet!');
+      addAuditLog('Sync', 'Database', 'GoogleSheets', 'Pushed complete application dataset to Google Sheets');
+      return { success: true, results };
+    } catch (err: any) {
+      addToast('error', 'Sync Failed', err?.message || 'Failed to update Google Sheet.');
+      return { success: false, message: err?.message };
     }
-    return res;
   };
 
   // Action Handlers
@@ -1423,6 +1495,10 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         deleteRecurringTransaction,
 
         syncAllToGoogleSheet,
+        isGoogleSignedIn,
+        googleUser,
+        handleGoogleSignIn,
+        handleGoogleLogout,
 
         filteredTransactions,
         summaryMetrics,

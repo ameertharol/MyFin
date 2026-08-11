@@ -20,6 +20,8 @@ import {
   PiggyBank,
   Clock,
   Key,
+  FileSpreadsheet,
+  RefreshCw,
 } from 'lucide-react';
 import { ChangePasswordModal } from '../modals/ChangePasswordModal';
 
@@ -42,7 +44,12 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPageTitle, onToggleSideba
     openQuickAdd,
     addToast,
     logout,
+    isGoogleSignedIn,
+    handleGoogleSignIn,
+    syncAllToGoogleSheet,
   } = useFinance();
+
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -240,6 +247,36 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPageTitle, onToggleSideba
             </div>
           )}
         </div>
+
+        {/* Google Sheets Live Sync Button */}
+        <button
+          onClick={async () => {
+            if (!isGoogleSignedIn) {
+              await handleGoogleSignIn();
+            } else {
+              setIsSyncing(true);
+              await syncAllToGoogleSheet(false);
+              setIsSyncing(false);
+            }
+          }}
+          disabled={isSyncing}
+          className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl font-medium text-xs shadow-xs transition-all border ${
+            isGoogleSignedIn
+              ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100'
+              : 'bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800 hover:bg-teal-100'
+          }`}
+          title={isGoogleSignedIn ? 'Live Synced to Google Sheet 13Ceb4ut03DWZ3GUJmMh2uduklLCc1qnn7faRjXV2pac. Click to Sync Now.' : 'Click to Sign In with Google & Auto-Sync to Sheet'}
+        >
+          {isSyncing ? (
+            <RefreshCw className="w-3.5 h-3.5 animate-spin text-teal-600" />
+          ) : (
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+          )}
+          <span className="hidden md:inline font-bold">
+            {isGoogleSignedIn ? 'Google Sheet Sync' : 'Sync Google Sheet'}
+          </span>
+          <span className={`w-2 h-2 rounded-full ${isGoogleSignedIn ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+        </button>
 
         {/* Theme Toggle (Light / Dark) */}
         <button
